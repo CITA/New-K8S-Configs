@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cita-site-wordpress-config
+  namespace: cita-site-website
+data:
+  generate-wp-config.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    mkdir -p /etc/wordpress
+
+    decode_b64_env()
+    {
+        local name="$1"
+        printf '%s' "${!name}" | base64 -d
+    }
+
+    DB_NAME="$(decode_b64_env DB_NAME_B64)"
+    DB_USER="$(decode_b64_env DB_USER_B64)"
+    DB_PASSWORD="$(decode_b64_env DB_PASSWORD_B64)"
+
+    AUTH_KEY="$(decode_b64_env AUTH_KEY_B64)"
+    SECURE_AUTH_KEY="$(decode_b64_env SECURE_AUTH_KEY_B64)"
+    LOGGED_IN_KEY="$(decode_b64_env LOGGED_IN_KEY_B64)"
+    NONCE_KEY="$(decode_b64_env NONCE_KEY_B64)"
+    AUTH_SALT="$(decode_b64_env AUTH_SALT_B64)"
+    SECURE_AUTH_SALT="$(decode_b64_env SECURE_AUTH_SALT_B64)"
+    LOGGED_IN_SALT="$(decode_b64_env LOGGED_IN_SALT_B64)"
+    NONCE_SALT="$(decode_b64_env NONCE_SALT_B64)"
+
+    php_escape()
+    {
+        printf '%s' "$1" |
+        sed \
+          -e 's/\\/\\\\/g' \
+          -e "s/'/\\\\'/g"
+    }
+
+    cat > /etc/wordpress/wp-config.php <<EOF
+    <?php
+
+    define( 'DB_NAME', '$(php_escape "$DB_NAME")' );
+    define( 'DB_USER', '$(php_escape "$DB_USER")' );
+    define( 'DB_PASSWORD', '$(php_escape "$DB_PASSWORD")' );
+    define( 'DB_HOST', 'cita-site-mariadb' );
+
+    define( 'DB_CHARSET', 'utf8mb4' );
+    define( 'DB_COLLATE', '' );
+
+    define( 'AUTH_KEY',         '$(php_escape "$AUTH_KEY")' );
+    define( 'SECURE_AUTH_KEY',  '$(php_escape "$SECURE_AUTH_KEY")' );
+    define( 'LOGGED_IN_KEY',    '$(php_escape "$LOGGED_IN_KEY")' );
+    define( 'NONCE_KEY',        '$(php_escape "$NONCE_KEY")' );
+    define( 'AUTH_SALT',        '$(php_escape "$AUTH_SALT")' );
+    define( 'SECURE_AUTH_SALT', '$(php_escape "$SECURE_AUTH_SALT")' );
+    define( 'LOGGED_IN_SALT',   '$(php_escape "$LOGGED_IN_SALT")' );
+    define( 'NONCE_SALT',       '$(php_escape "$NONCE_SALT")' );
+
+    \$table_prefix = 'wp_';
+
+    define( 'DISALLOW_FILE_MODS', false );
+    define( 'FS_METHOD', 'direct' );
+    define( 'AUTOMATIC_UPDATER_DISABLED', true );
+    define( 'WP_DEBUG', false );
+
+    if ( ! defined( 'ABSPATH' ) ) {
+        define( 'ABSPATH', '/usr/share/wordpress/' );
+    }
+
+    require_once ABSPATH . 'wp-settings.php';
+    EOF
+
+    chmod 640 /etc/wordpress/wp-config.php
+    chown root:apache /etc/wordpress/wp-config.php
+
+    echo "wp-config.php generated."

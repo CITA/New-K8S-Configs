@@ -1,0 +1,178 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cita-wiki
+  namespace: cita-wiki
+  labels:
+    app: cita-wiki
+
+spec:
+  replicas: 1
+
+  strategy:
+    type: Recreate
+
+  selector:
+    matchLabels:
+      app: cita-wiki
+
+  template:
+    metadata:
+      labels:
+        app: cita-wiki
+
+    spec:
+      nodeSelector:
+        cita.utoronto.ca/application-node: "true"
+
+      dnsPolicy: "None"
+
+      dnsConfig:
+        nameservers:
+          - 128.100.76.4
+          - 128.100.76.5
+        searches:
+          - cita.utoronto.ca
+
+      imagePullSecrets:
+        - name: dockerhub-credential
+
+      volumes:
+        - name: apache2-certs-keys
+          secret:
+            secretName: apache2-certs-keys
+
+        - name: db-initdb
+          configMap:
+            name: mysql-initdb-config
+
+        - name: db-mysql-cnf
+          configMap:
+            name: mysql-cnf-config
+
+        - name: wikiserv-volume-mount
+          persistentVolumeClaim:
+            claimName: app-pvc
+
+        - name: apache-vhost-config
+          configMap:
+            name: apache-vhost-config
+
+        - name: configmap-php
+          configMap:
+            name: configmap-php
+
+        - name: configmap-php-confd
+          configMap:
+            name: configmap-php-confd
+
+        - name: postfix-main-cf
+          configMap:
+            name: postfix-main-cf
+
+        - name: malvarezwiki-data
+          nfs:
+            server: 128.100.76.92
+            path: /mnt/raid-project
+
+      containers:
+        - name: db
+          image: mysql:5.7
+          imagePullPolicy: IfNotPresent
+
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: root_password
+
+          ports:
+            - name: db
+              containerPort: 3306
+              protocol: TCP
+
+          volumeMounts:
+            - name: db-initdb
+              mountPath: /docker-entrypoint-initdb.d
+
+            - name: db-mysql-cnf
+              mountPath: /etc/mysql/mysql.conf.d
+
+            - name: wikiserv-volume-mount
+              subPath: mysql
+              mountPath: /var/lib/mysql
+
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 1.5G
+            requests:
+              cpu: 1000m
+              memory: 1G
+
+        - name: web
+          image: citadockerhub/mediawiki_k8s:1.35.5.sendmail
+          imagePullPolicy: Always
+
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+
+            - name: https
+              containerPort: 443
+              protocol: TCP
+
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - >-
+                    a2enmod ssl &&
+                    service apache2 reload &&
+                    cd /etc/apache2/sites-available &&
+                    a2ensite * &&
+                    service apache2 reload &&
+                    service postfix start
+
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 1.5G
+            requests:
+              cpu: 1000m
+              memory: 1G
+
+          volumeMounts:
+            - name: wikiserv-volume-mount
+              mountPath: /var/www
+
+            - name: apache2-certs-keys
+              mountPath: /etc/apache2/ssl
+              readOnly: true
+
+            - name: apache2-certs-keys
+              mountPath: /etc/ssl/certs
+              readOnly: true
+
+            - name: apache-vhost-config
+              mountPath: /etc/apache2/sites-available
+
+            - name: configmap-php
+              mountPath: /usr/local/etc/php
+
+            - name: postfix-main-cf
+              mountPath: /etc/postfix/main.cf
+              subPath: main.cf
+
+            - name: configmap-php-confd
+              mountPath: /usr/local/etc/php/conf.d
+
+            - name: malvarezwiki-data
+              mountPath: /mnt/raid-project
+
+            - name: malvarezwiki-data
+              mountPath: /fs/lustre/project

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cita-site-php
+  namespace: cita-site-website
+data:
+  99-cita-wordpress.ini: |
+    memory_limit = 512M
+    upload_max_filesize = 1G
+    post_max_size = 1G
+    max_execution_time = 300
+    max_input_time = 300
+    max_input_vars = 5000

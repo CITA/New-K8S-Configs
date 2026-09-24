@@ -1,0 +1,122 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apache-vhost-config
+  namespace: cita-wiki
+data:
+  vhost-adminwiki.conf: |
+    <VirtualHost *:80>
+       ServerName adminwiki.cita.utoronto.ca
+       Redirect permanent / https://adminwiki.cita.utoronto.ca/
+    </VirtualHost>
+
+    <VirtualHost _default_:443>
+      ServerName adminwiki.cita.utoronto.ca
+      DocumentRoot /var/www/adminwiki/html
+      #DocumentRoot /var/www/html
+
+      SSLEngine on
+      SSLCertificateFile /etc/apache2/ssl/cita-wildcard.crt
+      SSLCertificateKeyFile /etc/apache2/ssl/cita-wildcard.key
+      SSLCACertificateFile /etc/apache2/ssl/STAR_cita_utoronto_ca.ca-bundle
+
+      RewriteEngine On
+      RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK)
+      RewriteRule .* - [F]
+      RewriteRule ^/adminwiki(/|$) /index.php/ [PT]
+
+      <Directory "/var/www/adminwiki/html">
+              AllowOverride None
+              Require all granted
+      </Directory>
+
+    </VirtualHost>
+
+  vhost-penwiki.conf: |
+    <VirtualHost *:80>
+       ServerName eor.cita.utoronto.ca
+       Redirect permanent / https://eor.cita.utoronto.ca/
+    </VirtualHost>
+
+    <VirtualHost _default_:443>
+      ServerName eor.cita.utoronto.ca
+      DocumentRoot /var/www/penwiki/html
+      #DocumentRoot /var/www/html
+
+      SSLEngine on
+      SSLCertificateFile /etc/apache2/ssl/cita-wildcard.crt
+      SSLCertificateKeyFile /etc/apache2/ssl/cita-wildcard.key
+      SSLCACertificateFile /etc/apache2/ssl/STAR_cita_utoronto_ca.ca-bundle
+
+      RewriteEngine On
+      RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK)
+      RewriteRule .* - [F]
+      RewriteRule ^/penwiki(/|$) /index.php/ [PT]
+
+      <Directory "/var/www/penwiki/html">
+              AllowOverride None
+              Require all granted
+      </Directory>
+
+    </VirtualHost>
+
+  vhost-computewiki.conf: |
+    <VirtualHost *:80>
+       ServerName wiki.cita.utoronto.ca
+       Redirect permanent / https://wiki.cita.utoronto.ca/
+    </VirtualHost>
+
+    <VirtualHost _default_:443>
+      ServerName wiki.cita.utoronto.ca
+      DocumentRoot /var/www/computewiki/html
+      #DocumentRoot /var/www/html
+
+      SSLEngine on
+      SSLCertificateFile /etc/apache2/ssl/cita-wildcard.crt
+      SSLCertificateKeyFile /etc/apache2/ssl/cita-wildcard.key
+      SSLCACertificateFile /etc/apache2/ssl/STAR_cita_utoronto_ca.ca-bundle
+
+      RewriteEngine On
+      RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK)
+      RewriteRule .* - [F]
+      RewriteRule ^/computewiki(/|$) /index.php/ [PT]
+
+      <Directory "/var/www/computewiki/html">
+              AllowOverride None
+              Require all granted
+      </Directory>
+    </VirtualHost>
+
+  vhost-malvarezwiki.conf: |
+    <VirtualHost *:80>
+        ServerName mocks.cita.utoronto.ca
+        Redirect permanent / https://mocks.cita.utoronto.ca/
+    </VirtualHost>
+
+    <VirtualHost _default_:443>
+        ServerName mocks.cita.utoronto.ca
+        DocumentRoot /var/www/malvarezwiki/html
+
+        SSLEngine on
+        SSLCertificateFile /etc/apache2/ssl/cita-wildcard.crt
+        SSLCertificateKeyFile /etc/apache2/ssl/cita-wildcard.key
+        SSLCACertificateFile /etc/apache2/ssl/STAR_cita_utoronto_ca.ca-bundle
+
+        RewriteEngine On
+        RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK)
+        RewriteRule .* - [F]
+        RewriteRule ^/malvarezwiki(/|$) /index.php/ [PT]
+        RewriteRule ^/websky$ index.php/WebSky_Extragalactic_CMB_Mocks [R]
+
+        <Directory "/var/www/malvarezwiki/html/data">
+                Options +Indexes +FollowSymLinks
+                AllowOverride All
+                Require all granted
+        </Directory>
+
+        <Directory "/var/www/malvarezwiki/html">
+                AllowOverride All
+                Require all granted
+        </Directory>
+
+    </VirtualHost>

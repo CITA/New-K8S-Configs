@@ -1,0 +1,9 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: public-apps-pool
+  namespace: metallb-system
+spec:
+  addresses:
+    - 142.1.127.101-142.1.127.110
+  autoAssign: false

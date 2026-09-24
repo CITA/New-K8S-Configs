@@ -1,0 +1,222 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cita-webmail
+  namespace: cita-webmail
+  labels:
+    app: cita-webmail
+
+spec:
+  replicas: 1
+
+  strategy:
+    type: Recreate
+
+  selector:
+    matchLabels:
+      app: cita-webmail
+
+  template:
+    metadata:
+      labels:
+        app: cita-webmail
+
+    spec:
+      nodeSelector:
+        cita.utoronto.ca/application-node: "true"
+
+      imagePullSecrets:
+        - name: dockerhub-credential
+
+      containers:
+
+        # ============================================================
+        # MariaDB
+        # ============================================================
+        - name: db
+          image: mariadb:12.3.3
+          imagePullPolicy: IfNotPresent
+
+          env:
+            - name: MARIADB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: root_password
+
+            - name: MARIADB_DATABASE
+              value: roundcube
+
+            - name: MARIADB_USER
+              value: roundcube
+
+            - name: MARIADB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: password
+
+          ports:
+            - name: mysql
+              containerPort: 3306
+              protocol: TCP
+
+          volumeMounts:
+            - name: db-data
+              mountPath: /var/lib/mysql
+
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+
+        # ============================================================
+        # Roundcube / Apache
+        # ============================================================
+        - name: web
+          image: citadockerhub/webmail_k8s:2.1.0
+          imagePullPolicy: IfNotPresent
+
+          env:
+            # --------------------------------------------------------
+            # Database
+            # --------------------------------------------------------
+            - name: ROUNDCUBEMAIL_DB_TYPE
+              value: mysql
+
+            - name: ROUNDCUBEMAIL_DB_HOST
+              value: 127.0.0.1
+
+            - name: ROUNDCUBEMAIL_DB_PORT
+              value: "3306"
+
+            - name: ROUNDCUBEMAIL_DB_NAME
+              value: roundcube
+
+            - name: ROUNDCUBEMAIL_DB_USER
+              value: roundcube
+
+            - name: ROUNDCUBEMAIL_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: password
+
+            # --------------------------------------------------------
+            # IMAP
+            # --------------------------------------------------------
+            - name: ROUNDCUBEMAIL_DEFAULT_HOST
+              value: "ssl://mail.cita.utoronto.ca"
+
+            - name: ROUNDCUBEMAIL_DEFAULT_PORT
+              value: "993"
+
+            # --------------------------------------------------------
+            # SMTP
+            # --------------------------------------------------------
+            - name: ROUNDCUBEMAIL_SMTP_SERVER
+              value: "tls://smtp.cita.utoronto.ca"
+
+            - name: ROUNDCUBEMAIL_SMTP_PORT
+              value: "587"
+
+            # --------------------------------------------------------
+            # Roundcube plugins
+            # --------------------------------------------------------
+            - name: ROUNDCUBEMAIL_PLUGINS
+              value: "archive,zipdownload"
+
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+
+            - name: https
+              containerPort: 443
+              protocol: TCP
+
+          volumeMounts:
+
+            # --------------------------------------------------------
+            # Roundcube custom configuration
+            # --------------------------------------------------------
+            - name: roundcube-config
+              mountPath: /var/roundcube/config
+              readOnly: true
+
+            # --------------------------------------------------------
+            # CITA mail CA bundle
+            # --------------------------------------------------------
+            - name: mail-ca
+              mountPath: /etc/pki/tls/certs/STAR_cita_utoronto_ca.ca-bundle
+              subPath: STAR_cita_utoronto_ca.ca-bundle
+              readOnly: true
+
+            # --------------------------------------------------------
+            # Apache virtual host
+            # Existing ConfigMap key:
+            #   vhost-webmail.conf
+            # --------------------------------------------------------
+            - name: apache-vhost
+              mountPath: /etc/apache2/sites-enabled/vhost-webmail.conf
+              subPath: vhost-webmail.conf
+              readOnly: true
+
+            # --------------------------------------------------------
+            # CITA wildcard certificate/key
+            # --------------------------------------------------------
+            - name: apache-tls
+              mountPath: /etc/apache2/ssl
+              readOnly: true
+
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 500Mi
+            limits:
+              cpu: 2000m
+              memory: 1Gi
+
+      volumes:
+
+        # ============================================================
+        # MariaDB data
+        # ============================================================
+        - name: db-data
+          persistentVolumeClaim:
+            claimName: cita-webmail-db-pvc
+
+        # ============================================================
+        # Roundcube custom configuration
+        # ============================================================
+        - name: roundcube-config
+          configMap:
+            name: roundcube-custom-config
+
+        # ============================================================
+        # CITA CA bundle
+        # ============================================================
+        - name: mail-ca
+          secret:
+            secretName: apache2-certs-keys
+            items:
+              - key: STAR_cita_utoronto_ca.ca-bundle
+                path: STAR_cita_utoronto_ca.ca-bundle
+
+        # ============================================================
+        # Apache TLS certificate/key
+        # ============================================================
+        - name: apache-tls
+          secret:
+            secretName: apache2-certs-keys
+
+        # ============================================================
+        # Existing Apache vhost ConfigMap
+        # Key: vhost-webmail.conf
+        # ============================================================
+        - name: apache-vhost
+          configMap:
+            name: apache-vhost-config

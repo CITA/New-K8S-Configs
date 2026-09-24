@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cita-pdf
+  namespace: cita-pdf
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 142.1.127.103
+  selector:
+    app: cita-pdf
+  ports:
+    - name: https
+      port: 443
+      targetPort: 443
+      protocol: TCP

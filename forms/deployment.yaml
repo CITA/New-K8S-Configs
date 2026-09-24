@@ -1,0 +1,329 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cita-forms
+  namespace: cita-forms
+  labels:
+    app: cita-forms
+
+spec:
+  replicas: 1
+
+  strategy:
+    type: Recreate
+
+  selector:
+    matchLabels:
+      app: cita-forms
+
+  template:
+    metadata:
+      labels:
+        app: cita-forms
+
+    spec:
+      nodeSelector:
+        cita.utoronto.ca/application-node: "true"
+
+      dnsPolicy: "None"
+
+      dnsConfig:
+        nameservers:
+          - 128.100.76.4
+          - 128.100.76.5
+        searches:
+          - cita.utoronto.ca
+
+      imagePullSecrets:
+        - name: dockerhub-credential
+
+      volumes:
+
+        - name: secret-volume
+          secret:
+            secretName: nginx-certs-keys
+
+        - name: configmap-volume
+          configMap:
+            name: nginx-config
+
+        - name: db-initdb
+          configMap:
+            name: mysql-initdb-config
+
+        - name: db-mysql-cnf
+          configMap:
+            name: mysql-cnf-config
+
+        - name: forms-volume-mount
+          persistentVolumeClaim:
+            claimName: app-pvc
+
+      containers:
+
+        - name: nginx
+          image: nginx:stable
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: https
+              containerPort: 443
+              protocol: TCP
+
+            - name: http
+              containerPort: 80
+              protocol: TCP
+
+          volumeMounts:
+            - name: secret-volume
+              mountPath: /etc/nginx/ssl
+
+            - name: configmap-volume
+              mountPath: /etc/nginx/conf.d
+
+            - name: forms-volume-mount
+              subPath: forms_upload
+              mountPath: /FORMS/uploads
+
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+
+            requests:
+              cpu: 500m
+              memory: 200Mi
+
+        - name: db
+          image: mysql:5.7
+          imagePullPolicy: IfNotPresent
+
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: root_password
+
+          args:
+            - --character-set-server=utf8mb4
+
+          ports:
+            - name: db
+              containerPort: 3306
+              protocol: TCP
+
+          volumeMounts:
+            - name: db-initdb
+              mountPath: /docker-entrypoint-initdb.d
+
+            - name: db-mysql-cnf
+              mountPath: /etc/mysql/mysql.conf.d
+
+            - name: forms-volume-mount
+              subPath: mysql
+              mountPath: /var/lib/mysql
+
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 2G
+
+            requests:
+              cpu: 1000m
+              memory: 1G
+
+        - name: web
+          image: citadockerhub/forms_k8s:1.2.9
+          imagePullPolicy: Always
+
+          command:
+            - /bin/sh
+            - -c
+
+          args:
+            - >-
+              sleep 20;
+              python manage.py makemigrations users;
+              python manage.py makemigrations;
+              python manage.py migrate users;
+              python manage.py migrate;
+              gunicorn FORMS.wsgi:application --preload
+              --bind 0.0.0.0:8000 --workers=3
+
+          ports:
+            - name: gunicorn
+              containerPort: 8000
+              protocol: TCP
+
+          volumeMounts:
+            - name: forms-volume-mount
+              subPath: forms_upload
+              mountPath: /FORMS/uploads
+
+          env:
+
+            - name: DEFAULT_PUB_YEAR
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DEFAULT_PUB_YEAR
+
+            - name: SURF_APPLICATION_START_TIME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SURF_APPLICATION_START_TIME
+
+            - name: SURF_APPLICATION_END_TIME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SURF_APPLICATION_END_TIME
+
+            - name: AGM_VOTE_DEADLINE
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: AGM_VOTE_DEADLINE
+
+            - name: AGM_MEETING
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: AGM_MEETING
+
+            - name: gen_targz_hour
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: gen_targz_hour
+
+            - name: gen_targz_minute
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: gen_targz_minute
+
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: ENVIRONMENT
+
+            - name: DEBUG
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DEBUG
+
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: SECRET_KEY
+
+            - name: DJANGO_ALLOWED_HOSTS
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DJANGO_ALLOWED_HOSTS
+
+            - name: LDAP_SERVER
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: LDAP_SERVER
+
+            - name: DB_ENGINE
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_ENGINE
+
+            - name: DB_DATABASE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_DATABASE_NAME
+
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_USER
+
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_PASSWORD
+
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_HOST
+
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_PORT
+
+            - name: DB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_ROOT_PASSWORD
+
+            - name: EMAIL_BACKEND
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: EMAIL_BACKEND
+
+            - name: EMAIL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: EMAIL_HOST
+
+            - name: EMAIL_HOST_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: EMAIL_HOST_USER
+
+            - name: EMAIL_HOST_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: EMAIL_HOST_PASSWORD
+
+            - name: EMAIL_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: EMAIL_PORT
+
+            - name: EMAIL_USE_TLS
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: EMAIL_USE_TLS
+
+            - name: DEFAULT_FROM_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DEFAULT_FROM_EMAIL
+
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 1G
+
+            requests:
+              cpu: 1000m
+              memory: 500Mi

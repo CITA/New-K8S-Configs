@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: indico-config
+  namespace: cita-indico
+data:
+  indico.conf: |
+    SECRET_KEY = __import__('os').environ['INDICO_SECRET_KEY']
+
+    SQLALCHEMY_DATABASE_URI = (
+        'postgresql://indico:'
+        + __import__('os').environ['INDICO_DB_PASSWORD']
+        + '@postgres:5432/indico'
+    )
+
+    BASE_URL = 'https://conference.cita.utoronto.ca'
+
+    CELERY_BROKER = 'redis://redis:6379/0'
+    REDIS_CACHE_URL = 'redis://redis:6379/1'
+
+    DEFAULT_TIMEZONE = 'America/Toronto'
+    DEFAULT_LOCALE = 'en_GB'
+
+    ENABLE_ROOMBOOKING = False
+
+    CACHE_DIR = '/opt/indico/cache'
+    TEMP_DIR = '/opt/indico/tmp'
+    LOG_DIR = '/opt/indico/log'
+
+    LOCAL_PASSWORD_MIN_LENGTH = 15
+
+    STORAGE_BACKENDS = {'default': 'fs:/opt/indico/archive'}
+    ATTACHMENT_STORAGE = 'default'
+
+    SMTP_SERVER = ('smtp.cita.utoronto.ca', 25)
+    SMTP_USE_TLS = False
+    SMTP_LOGIN = ''
+    SMTP_PASSWORD = ''
+
+    SUPPORT_EMAIL = 'sysadmin@cita.utoronto.ca'
+    PUBLIC_SUPPORT_EMAIL = 'sysadmin@cita.utoronto.ca'
+    NO_REPLY_EMAIL = 'noreply@cita.utoronto.ca'
+
+    ALLOW_PUBLIC_USER_SEARCH = False
+
+    SESSION_LIFETIME = 43200
+    SESSION_MAX_LIFETIME = 86400

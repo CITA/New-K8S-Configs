@@ -1,0 +1,203 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: indico-celery
+  namespace: cita-indico
+  labels:
+    app: indico-celery
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: indico-celery
+
+  template:
+    metadata:
+      labels:
+        app: indico-celery
+
+    spec:
+      securityContext:
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+
+      imagePullSecrets:
+        - name: dockerhub-credential
+
+      volumes:
+        - name: indico-config
+          configMap:
+            name: indico-config
+
+        - name: indico-pvc
+          persistentVolumeClaim:
+            claimName: indico-pvc
+
+      containers:
+        - name: worker
+          image: citadockerhub/indico:3.3.13-cita1
+          imagePullPolicy: Always
+
+          env:
+            - name: INDICO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: indico-secret
+                  key: SECRET_KEY
+
+            - name: INDICO_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: indico-db-secret
+                  key: INDICO_DB_PASSWORD
+
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: indico-db-secret
+                  key: INDICO_DB_PASSWORD
+
+            - name: PGHOST
+              value: postgres
+
+            - name: PGPORT
+              value: "5432"
+
+            - name: PGDATABASE
+              value: indico
+
+            - name: PGUSER
+              value: indico
+
+            - name: XDG_CACHE_HOME
+              value: /opt/indico/.cache
+
+          command:
+            - /opt/indico/docker_entrypoint.sh
+
+          args:
+            - indico
+            - celery
+            - worker
+            - --concurrency=4
+
+          volumeMounts:
+            - name: indico-config
+              mountPath: /opt/indico/etc/indico.conf
+              subPath: indico.conf
+              readOnly: true
+
+            - name: indico-pvc
+              mountPath: /opt/indico/archive
+              subPath: archive
+
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2
+              memory: 3Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: indico-celery-beat
+  namespace: cita-indico
+  labels:
+    app: indico-celery-beat
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: indico-celery-beat
+
+  template:
+    metadata:
+      labels:
+        app: indico-celery-beat
+
+    spec:
+      securityContext:
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+
+      imagePullSecrets:
+        - name: dockerhub-credential
+
+      volumes:
+        - name: indico-config
+          configMap:
+            name: indico-config
+
+        - name: indico-pvc
+          persistentVolumeClaim:
+            claimName: indico-pvc
+
+      containers:
+        - name: beat
+          image: citadockerhub/indico:3.3.13-cita1
+          imagePullPolicy: Always
+
+          env:
+            - name: INDICO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: indico-secret
+                  key: SECRET_KEY
+
+            - name: INDICO_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: indico-db-secret
+                  key: INDICO_DB_PASSWORD
+
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: indico-db-secret
+                  key: INDICO_DB_PASSWORD
+
+            - name: PGHOST
+              value: postgres
+
+            - name: PGPORT
+              value: "5432"
+
+            - name: PGDATABASE
+              value: indico
+
+            - name: PGUSER
+              value: indico
+
+            - name: XDG_CACHE_HOME
+              value: /opt/indico/.cache
+
+          command:
+            - /opt/indico/docker_entrypoint.sh
+
+          args:
+            - indico
+            - celery
+            - beat
+
+          volumeMounts:
+            - name: indico-config
+              mountPath: /opt/indico/etc/indico.conf
+              subPath: indico.conf
+              readOnly: true
+
+            - name: indico-pvc
+              mountPath: /opt/indico/archive
+              subPath: archive
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 768Mi

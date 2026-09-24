@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: roundcube-custom-config
+  namespace: cita-webmail
+
+data:
+  zzz-cita.inc.php: |
+    <?php
+
+    $config['db_prefix'] = 'rc';
+    $config['product_name'] = 'CITA Webmail';
+
+    $config['mail_domain'] = 'cita.utoronto.ca';
+    $config['username_domain'] = 'cita.utoronto.ca';
+
+    $config['smtp_user'] = '%u';
+    $config['smtp_pass'] = '%p';
+
+    $config['force_https'] = true;
+    $config['support_url'] = 'http://wiki.cita.utoronto.ca';
+
+    $config['imap_conn_options'] = [
+        'ssl' => [
+            'verify_peer'      => true,
+            'verify_peer_name' => true,
+            'cafile'           => '/etc/pki/tls/certs/STAR_cita_utoronto_ca.ca-bundle',
+            'peer_name'        => '*.cita.utoronto.ca',
+            'ciphers'          => 'DEFAULT:@SECLEVEL=1',
+        ],
+    ];
+
+    $config['smtp_conn_options'] = [
+        'ssl' => [
+            'verify_peer'      => true,
+            'verify_peer_name' => true,
+            'cafile'           => '/etc/pki/tls/certs/STAR_cita_utoronto_ca.ca-bundle',
+            'peer_name'        => '*.cita.utoronto.ca',
+            'ciphers'          => 'DEFAULT:@SECLEVEL=1',
+        ],
+    ];

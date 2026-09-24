@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app-pvc
+  namespace: cita-forms
+  labels:
+    app: cita-forms
+spec:
+  storageClassName: nfs-cita
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi

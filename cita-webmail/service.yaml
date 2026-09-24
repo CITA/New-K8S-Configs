@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cita-webmail
+  namespace: cita-webmail
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 142.1.127.101
+  selector:
+    app: cita-webmail
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 443
+      protocol: TCP

@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: cita-indico
+spec:
+  selector:
+    app: indico-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: indico-redis
+  namespace: cita-indico
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: indico-redis
+  template:
+    metadata:
+      labels:
+        app: indico-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:6.2
+          args:
+            - redis-server
+            - --appendonly
+            - "no"
+            - --save
+            - "3600 1 300 100 60 10000"
+          ports:
+            - name: redis
+              containerPort: 6379
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

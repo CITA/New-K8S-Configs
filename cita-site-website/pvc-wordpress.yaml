@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cita-site-wordpress-pvc
+  namespace: cita-site-website
+  labels:
+    app: cita-site-website
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-cita
+  resources:
+    requests:
+      storage: 20Gi

@@ -1,0 +1,303 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cita-pdf
+  namespace: cita-pdf
+  labels:
+    app: cita-pdf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cita-pdf
+  template:
+    metadata:
+      labels:
+        app: cita-pdf
+    spec:
+      dnsPolicy: None
+      dnsConfig:
+        nameservers:
+          - 128.100.76.4
+          - 128.100.76.5
+        searches:
+          - cita.utoronto.ca
+
+      imagePullSecrets:
+        - name: dockerhub-credential
+
+      volumes:
+        - name: nginx-certs
+          secret:
+            secretName: nginx-certs-keys
+
+        - name: nginx-config
+          configMap:
+            name: nginx-config
+
+        - name: db-initdb
+          configMap:
+            name: mysql-initdb-config
+
+        - name: db-mysql-cnf
+          configMap:
+            name: mysql-cnf-config
+
+        - name: dbbackup-secret
+          secret:
+            secretName: dbbackup-secret
+            defaultMode: 0400
+
+        - name: dbbackup-init
+          configMap:
+            name: dbbackup-init
+            defaultMode: 0755
+
+        - name: pdf-volume
+          persistentVolumeClaim:
+            claimName: app-pvc
+
+      containers:
+
+        - name: nginx
+          image: nginx:stable
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 80
+            - name: https
+              containerPort: 443
+
+          volumeMounts:
+            - name: nginx-certs
+              mountPath: /etc/nginx/ssl
+              readOnly: true
+
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+
+            - name: pdf-volume
+              mountPath: /PDF_app_site/uploads
+              subPath: pdf_upload
+
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+            requests:
+              cpu: 500m
+              memory: 200Mi
+
+        - name: db
+          image: mysql:5.7
+          imagePullPolicy: IfNotPresent
+
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: root_password
+
+          ports:
+            - name: db
+              containerPort: 3306
+
+          volumeMounts:
+            - name: db-initdb
+              mountPath: /docker-entrypoint-initdb.d
+
+            - name: db-mysql-cnf
+              mountPath: /etc/mysql/mysql.conf.d
+
+            - name: pdf-volume
+              mountPath: /var/lib/mysql
+              subPath: mysql
+
+            - name: dbbackup-secret
+              mountPath: /run/secrets/dbbackup
+              readOnly: true
+
+            - name: dbbackup-init
+              mountPath: /docker-entrypoint-initdb.d/dbbackup-init.sh
+              subPath: dbbackup-init.sh
+
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+            requests:
+              cpu: 1000m
+              memory: 1Gi
+
+        - name: web
+          image: citadockerhub/pdf_app_site_k8s:1.5.0
+          imagePullPolicy: Always
+
+          command:
+            - /bin/sh
+            - -c
+
+          args:
+            - |
+              sleep 20
+              python manage.py makemigrations users
+              python manage.py makemigrations
+              python manage.py migrate users
+              python manage.py migrate
+              exec gunicorn PDF_app_site.wsgi:application \
+                --preload \
+                --bind 0.0.0.0:8000 \
+                --workers=3 \
+                --timeout 120
+
+          env:
+            - name: PDF_APPLICATION_START_TIME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: PDF_APPLICATION_START_TIME
+            - name: PDF_APPLICATION_END_TIME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: PDF_APPLICATION_END_TIME
+            - name: REF_APPLICATION_START_TIME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: REF_APPLICATION_START_TIME
+            - name: REF_APPLICATION_END_TIME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: REF_APPLICATION_END_TIME
+            - name: SPONSOR_DEADLINE
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SPONSOR_DEADLINE
+            - name: gen_targz_hour
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: gen_targz_hour
+            - name: gen_targz_minute
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: gen_targz_minute
+            - name: ENTRY_PER_PAGE
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: ENTRY_PER_PAGE
+
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: ENVIRONMENT
+            - name: DEBUG
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DEBUG
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: SECRET_KEY
+            - name: DJANGO_ALLOWED_HOSTS
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DJANGO_ALLOWED_HOSTS
+            - name: DB_ENGINE
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_ENGINE
+            - name: DB_DATABASE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_DATABASE_NAME
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_PASSWORD
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_PORT
+            - name: DB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DB_ROOT_PASSWORD
+            - name: EMAIL_BACKEND
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: EMAIL_BACKEND
+            - name: EMAIL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: EMAIL_HOST
+            - name: EMAIL_HOST_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: EMAIL_HOST_USER
+            - name: EMAIL_HOST_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: EMAIL_HOST_PASSWORD
+            - name: EMAIL_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: EMAIL_PORT
+            - name: EMAIL_USE_TLS
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: EMAIL_USE_TLS
+            - name: DEFAULT_FROM_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: DEFAULT_FROM_EMAIL
+
+          ports:
+            - name: web
+              containerPort: 8000
+
+          volumeMounts:
+            - name: pdf-volume
+              mountPath: /PDF_app_site/uploads
+              subPath: pdf_upload
+
+          resources:
+            limits:
+              cpu: 3000m
+              memory: 3Gi
+            requests:
+              cpu: 2500m
+              memory: 2Gi

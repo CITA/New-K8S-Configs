@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app-pvc
+  namespace: cita-pdf
+  labels:
+    app: cita-pdf
+spec:
+  storageClassName: nfs-cita
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi

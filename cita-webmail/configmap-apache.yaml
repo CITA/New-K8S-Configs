@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apache-vhost-config
+  namespace: cita-webmail
+
+data:
+  vhost-webmail.conf: |
+    <VirtualHost *:80>
+      ServerName webmail.cita.utoronto.ca
+      Redirect permanent / https://webmail.cita.utoronto.ca/
+    </VirtualHost>
+
+    <VirtualHost _default_:443>
+      ServerName webmail.cita.utoronto.ca
+
+      DocumentRoot /var/www/html/public_html
+
+      SSLEngine on
+      SSLCertificateFile /etc/apache2/ssl/cita-wildcard.crt
+      SSLCertificateKeyFile /etc/apache2/ssl/cita-wildcard.key
+
+      <Directory /var/www/html/public_html>
+        AllowOverride All
+        Require all granted
+      </Directory>
+
+      ErrorLog ${APACHE_LOG_DIR}/error.log
+      CustomLog ${APACHE_LOG_DIR}/access.log combined
+    </VirtualHost>

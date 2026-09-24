@@ -1,0 +1,155 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cita-indico
+  namespace: cita-indico
+  labels:
+    app: cita-indico
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: cita-indico
+
+  template:
+    metadata:
+      labels:
+        app: cita-indico
+
+    spec:
+      securityContext:
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+
+      imagePullSecrets:
+        - name: dockerhub-credential
+
+      volumes:
+        - name: indico-config
+          configMap:
+            name: indico-config
+
+        - name: indico-pvc
+          persistentVolumeClaim:
+            claimName: indico-pvc
+
+        - name: static-shared
+          emptyDir: {}
+
+        - name: nginx-config
+          configMap:
+            name: nginx-config
+
+        - name: nginx-certs
+          secret:
+            secretName: nginx-certs-keys
+
+      containers:
+
+        - name: indico
+          image: citadockerhub/indico:3.3.13-cita1
+          imagePullPolicy: Always
+
+          env:
+            - name: INDICO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: indico-secret
+                  key: SECRET_KEY
+
+            - name: INDICO_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: indico-db-secret
+                  key: INDICO_DB_PASSWORD
+
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: indico-db-secret
+                  key: INDICO_DB_PASSWORD
+
+            - name: PGHOST
+              value: postgres
+
+            - name: PGPORT
+              value: "5432"
+
+            - name: PGDATABASE
+              value: indico
+
+            - name: PGUSER
+              value: indico
+
+            - name: REDIS_HOST
+              value: redis
+
+            - name: XDG_CACHE_HOME
+              value: /opt/indico/.cache
+
+          command:
+            - /opt/indico/docker_entrypoint.sh
+
+          args:
+            - /opt/indico/run_indico.sh
+
+          ports:
+            - name: indico
+              containerPort: 59999
+              protocol: TCP
+
+          volumeMounts:
+            - name: indico-config
+              mountPath: /opt/indico/etc/indico.conf
+              subPath: indico.conf
+              readOnly: true
+
+            - name: indico-pvc
+              mountPath: /opt/indico/archive
+              subPath: archive
+
+            - name: static-shared
+              mountPath: /opt/indico/static-shared
+
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2
+              memory: 3Gi
+
+        - name: nginx
+          image: nginx:stable
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+
+            - name: https
+              containerPort: 443
+              protocol: TCP
+
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+
+            - name: nginx-certs
+              mountPath: /etc/nginx/ssl
+              readOnly: true
+
+            - name: static-shared
+              mountPath: /opt/indico/static-shared
+              readOnly: true
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
