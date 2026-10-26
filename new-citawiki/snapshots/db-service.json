@@ -1,0 +1,41 @@
+{
+    "apiVersion": "v1",
+    "kind": "Service",
+    "metadata": {
+        "annotations": {
+            "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{},\"name\":\"new-citawiki-db\",\"namespace\":\"cita-wiki\"},\"spec\":{\"ports\":[{\"name\":\"mysql\",\"port\":3306,\"protocol\":\"TCP\",\"targetPort\":\"mysql\"}],\"selector\":{\"app\":\"new-citawiki-db\"},\"type\":\"ClusterIP\"}}\n"
+        },
+        "creationTimestamp": "2026-10-23T00:27:17Z",
+        "name": "new-citawiki-db",
+        "namespace": "cita-wiki",
+        "resourceVersion": "12153224",
+        "uid": "52083cee-86ca-4cf4-9909-701a31714044"
+    },
+    "spec": {
+        "clusterIP": "10.233.30.220",
+        "clusterIPs": [
+            "10.233.30.220"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+            "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+            {
+                "name": "mysql",
+                "port": 3306,
+                "protocol": "TCP",
+                "targetPort": "mysql"
+            }
+        ],
+        "selector": {
+            "app": "new-citawiki-db"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+    },
+    "status": {
+        "loadBalancer": {}
+    }
+}

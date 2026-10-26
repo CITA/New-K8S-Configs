@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cita-site-website
+  namespace: cita-site-website
+  labels:
+    app: cita-site-website
+spec:
+  type: ClusterIP
+
+  selector:
+    app: cita-site-website
+
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: http
+
+    - name: https
+      protocol: TCP
+      port: 443
+      targetPort: https

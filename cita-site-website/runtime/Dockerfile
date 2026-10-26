@@ -11,7 +11,7 @@ RUN dnf -y install \
         https://rpms.remirepo.net/enterprise/remi-release-9.rpm \
     && dnf -y module reset php \
     && dnf -y module enable php:remi-8.4 \
-    && dnf -y install \
+    && dnf --refresh -y install \
         httpd \
         mod_ssl \
         php \
@@ -33,6 +33,8 @@ RUN dnf -y install \
         gzip \
         tar \
         unzip \
+    && php -r 'exit(version_compare(PHP_VERSION, "8.4.27", ">=") ? 0 : 1);' \
+    && rm -f /etc/httpd/conf.d/ssl.conf \
     && dnf clean all \
     && rm -rf /var/cache/dnf
 
@@ -49,9 +51,17 @@ RUN mkdir -p \
         /var/lib/php/session \
         /var/lib/php/wsdlcache
 
+# ------------------------------------------------------------
+# Startup script
+# ------------------------------------------------------------
+
 COPY start.sh /usr/local/sbin/cita-wordpress-start
 
 RUN chmod 755 /usr/local/sbin/cita-wordpress-start
+
+# ------------------------------------------------------------
+# Ports and startup
+# ------------------------------------------------------------
 
 EXPOSE 80 443
 

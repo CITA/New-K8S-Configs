@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cita-site-website
+  namespace: cita-site-website
+  labels:
+    app: cita-site-website
+spec:
+  replicas: 1
+
+  strategy:
+    type: Recreate
+
+  selector:
+    matchLabels:
+      app: cita-site-website
+
+  template:
+    metadata:
+      labels:
+        app: cita-site-website
+
+    spec:
+      nodeSelector:
+        cita.utoronto.ca/application-node: "true"
+
+      imagePullSecrets:
+        - name: dockerhub-credential
+
+      initContainers:
+        - name: generate-wp-config
+          image: citadockerhub/wordpress_k8s:1.0.2
+          imagePullPolicy: IfNotPresent
+
+          command:
+            - /config/generate-wp-config.sh
+
+          envFrom:
+            - secretRef:
+                name: cita-site-wordpress-secrets
+
+          volumeMounts:
+            - name: wordpress-config-generator
+              mountPath: /config
+              readOnly: true
+
+            - name: wordpress-config
+              mountPath: /etc/wordpress
+
+      containers:
+        - name: web
+          image: citadockerhub/wordpress_k8s:1.0.2
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+
+            - name: https
+              containerPort: 443
+              protocol: TCP
+
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+
+          readinessProbe:
+            tcpSocket:
+              port: https
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 12
+
+          livenessProbe:
+            tcpSocket:
+              port: https
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+
+          volumeMounts:
+            - name: wordpress
+              mountPath: /usr/share/wordpress
+
+            - name: wordpress-config
+              mountPath: /etc/wordpress
+
+            - name: apache-config
+              mountPath: /etc/httpd/conf.d/site.cita.utoronto.ca.conf
+              subPath: site.cita.utoronto.ca.conf
+              readOnly: true
+
+            - name: php-config
+              mountPath: /etc/php.d/99-cita-wordpress.ini
+              subPath: 99-cita-wordpress.ini
+              readOnly: true
+
+            - name: tls
+              mountPath: /etc/httpd/tls
+              readOnly: true
+
+      volumes:
+        - name: wordpress
+          persistentVolumeClaim:
+            claimName: cita-site-wordpress-pvc
+
+        - name: wordpress-config
+          emptyDir: {}
+
+        - name: wordpress-config-generator
+          configMap:
+            name: cita-site-wordpress-config
+            defaultMode: 0555
+
+        - name: apache-config
+          configMap:
+            name: cita-site-apache
+
+        - name: php-config
+          configMap:
+            name: cita-site-php
+
+        - name: tls
+          secret:
+            secretName: cita-site-tls
+            defaultMode: 0440

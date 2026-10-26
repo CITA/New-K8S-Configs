@@ -77,7 +77,7 @@ spec:
         # Roundcube / Apache
         # ============================================================
         - name: web
-          image: citadockerhub/webmail_k8s:2.1.0
+          image: citadockerhub/webmail_k8s:2.1.1
           imagePullPolicy: IfNotPresent
 
           env:

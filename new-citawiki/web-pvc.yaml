@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: new-citawiki-files-pvc
+  namespace: cita-wiki
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-cita
+  resources:
+    requests:
+      storage: 50Gi
+  volumeMode: Filesystem

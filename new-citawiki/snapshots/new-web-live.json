@@ -1,0 +1,216 @@
+{
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "metadata": {
+        "annotations": {
+            "deployment.kubernetes.io/revision": "5",
+            "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"name\":\"new-citawiki\",\"namespace\":\"cita-wiki\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app\":\"new-citawiki\"}},\"template\":{\"metadata\":{\"labels\":{\"app\":\"new-citawiki\"}},\"spec\":{\"containers\":[{\"args\":[\"a2enmod ssl \\u0026\\u0026 exec apache2-foreground\"],\"command\":[\"/bin/sh\",\"-c\"],\"env\":[{\"name\":\"CITAWIKI_DB_PASSWORD\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"password\",\"name\":\"new-citawiki-app-secret\"}}}],\"image\":\"docker.io/citadockerhub/mediawiki_k8s:1.43.11-cita1-php8.3.36\",\"imagePullPolicy\":\"IfNotPresent\",\"name\":\"web\",\"ports\":[{\"containerPort\":80,\"name\":\"http\",\"protocol\":\"TCP\"},{\"containerPort\":443,\"name\":\"https\",\"protocol\":\"TCP\"}],\"resources\":{\"limits\":{\"cpu\":\"2\",\"memory\":\"1500Mi\"},\"requests\":{\"cpu\":\"1\",\"memory\":\"1Gi\"}},\"volumeMounts\":[{\"mountPath\":\"/var/www\",\"name\":\"wiki-files\"},{\"mountPath\":\"/etc/apache2/ssl\",\"name\":\"apache2-certs-keys\"},{\"mountPath\":\"/etc/ssl/certs\",\"name\":\"apache2-certs-keys\"},{\"mountPath\":\"/etc/apache2/sites-enabled\",\"name\":\"apache-vhost-config\"},{\"mountPath\":\"/usr/local/etc/php\",\"name\":\"configmap-php\"},{\"mountPath\":\"/etc/postfix/main.cf\",\"name\":\"postfix-main-cf\",\"subPath\":\"main.cf\"},{\"mountPath\":\"/usr/local/etc/php/conf.d\",\"name\":\"configmap-php-confd\"},{\"mountPath\":\"/mnt/raid-project\",\"name\":\"malvarezwiki-data\"},{\"mountPath\":\"/fs/lustre/project\",\"name\":\"malvarezwiki-data\"}]}],\"imagePullSecrets\":[{\"name\":\"dockerhub-credential\"}],\"terminationGracePeriodSeconds\":60,\"volumes\":[{\"name\":\"wiki-files\",\"persistentVolumeClaim\":{\"claimName\":\"new-citawiki-files-pvc\"}},{\"name\":\"apache2-certs-keys\",\"secret\":{\"secretName\":\"apache2-certs-keys\"}},{\"configMap\":{\"name\":\"apache-vhost-config\"},\"name\":\"apache-vhost-config\"},{\"configMap\":{\"name\":\"new-citawiki-php\"},\"name\":\"configmap-php\"},{\"configMap\":{\"name\":\"configmap-php-confd\"},\"name\":\"configmap-php-confd\"},{\"configMap\":{\"name\":\"postfix-main-cf\"},\"name\":\"postfix-main-cf\"},{\"name\":\"malvarezwiki-data\",\"nfs\":{\"path\":\"/mnt/raid-project\",\"server\":\"128.100.76.92\"}}]}}}}\n"
+        },
+        "creationTimestamp": "2026-10-23T04:13:37Z",
+        "generation": 5,
+        "name": "new-citawiki",
+        "namespace": "cita-wiki",
+        "resourceVersion": "12153319",
+        "uid": "6f026c2b-fee8-4e8a-9d71-7f28de01ed95"
+    },
+    "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+            "matchLabels": {
+                "app": "new-citawiki"
+            }
+        },
+        "strategy": {
+            "rollingUpdate": {
+                "maxSurge": "25%",
+                "maxUnavailable": "25%"
+            },
+            "type": "RollingUpdate"
+        },
+        "template": {
+            "metadata": {
+                "labels": {
+                    "app": "new-citawiki"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "args": [
+                            "a2enmod ssl \u0026\u0026 exec apache2-foreground"
+                        ],
+                        "command": [
+                            "/bin/sh",
+                            "-c"
+                        ],
+                        "env": [
+                            {
+                                "name": "CITAWIKI_DB_PASSWORD",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "password",
+                                        "name": "new-citawiki-app-secret"
+                                    }
+                                }
+                            }
+                        ],
+                        "image": "docker.io/citadockerhub/mediawiki_k8s:1.43.11-cita1-php8.3.36",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "web",
+                        "ports": [
+                            {
+                                "containerPort": 80,
+                                "name": "http",
+                                "protocol": "TCP"
+                            },
+                            {
+                                "containerPort": 443,
+                                "name": "https",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "resources": {
+                            "limits": {
+                                "cpu": "2",
+                                "memory": "1500Mi"
+                            },
+                            "requests": {
+                                "cpu": "1",
+                                "memory": "1Gi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/www",
+                                "name": "wiki-files"
+                            },
+                            {
+                                "mountPath": "/etc/apache2/ssl",
+                                "name": "apache2-certs-keys"
+                            },
+                            {
+                                "mountPath": "/etc/ssl/certs",
+                                "name": "apache2-certs-keys"
+                            },
+                            {
+                                "mountPath": "/etc/apache2/sites-enabled",
+                                "name": "apache-vhost-config"
+                            },
+                            {
+                                "mountPath": "/usr/local/etc/php",
+                                "name": "configmap-php"
+                            },
+                            {
+                                "mountPath": "/etc/postfix/main.cf",
+                                "name": "postfix-main-cf",
+                                "subPath": "main.cf"
+                            },
+                            {
+                                "mountPath": "/usr/local/etc/php/conf.d",
+                                "name": "configmap-php-confd"
+                            },
+                            {
+                                "mountPath": "/mnt/raid-project",
+                                "name": "malvarezwiki-data"
+                            },
+                            {
+                                "mountPath": "/fs/lustre/project",
+                                "name": "malvarezwiki-data"
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "imagePullSecrets": [
+                    {
+                        "name": "dockerhub-credential"
+                    }
+                ],
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "terminationGracePeriodSeconds": 60,
+                "volumes": [
+                    {
+                        "name": "wiki-files",
+                        "persistentVolumeClaim": {
+                            "claimName": "new-citawiki-files-pvc"
+                        }
+                    },
+                    {
+                        "name": "apache2-certs-keys",
+                        "secret": {
+                            "defaultMode": 420,
+                            "secretName": "apache2-certs-keys"
+                        }
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "name": "apache-vhost-config"
+                        },
+                        "name": "apache-vhost-config"
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "name": "new-citawiki-php"
+                        },
+                        "name": "configmap-php"
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "name": "configmap-php-confd"
+                        },
+                        "name": "configmap-php-confd"
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "name": "postfix-main-cf"
+                        },
+                        "name": "postfix-main-cf"
+                    },
+                    {
+                        "name": "malvarezwiki-data",
+                        "nfs": {
+                            "path": "/mnt/raid-project",
+                            "server": "128.100.76.92"
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "status": {
+        "availableReplicas": 1,
+        "conditions": [
+            {
+                "lastTransitionTime": "2026-10-23T04:13:39Z",
+                "lastUpdateTime": "2026-10-23T04:13:39Z",
+                "message": "Deployment has minimum availability.",
+                "reason": "MinimumReplicasAvailable",
+                "status": "True",
+                "type": "Available"
+            },
+            {
+                "lastTransitionTime": "2026-10-23T04:13:37Z",
+                "lastUpdateTime": "2026-10-23T17:43:02Z",
+                "message": "ReplicaSet \"new-citawiki-5b44db8cb\" has successfully progressed.",
+                "reason": "NewReplicaSetAvailable",
+                "status": "True",
+                "type": "Progressing"
+            }
+        ],
+        "observedGeneration": 5,
+        "readyReplicas": 1,
+        "replicas": 1,
+        "terminatingReplicas": 0,
+        "updatedReplicas": 1
+    }
+}

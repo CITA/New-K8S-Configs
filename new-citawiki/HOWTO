@@ -1,0 +1,145 @@
+NEW-CITAWIKI: BASIC RECOVERY AND STOPPING COMMANDS
+=================================================
+
+Configuration directory:
+/k8s/configs/new-citawiki
+
+Kubernetes namespace:
+cita-wiki
+
+Production public IP:
+142.1.127.104
+
+New test deployment public IP:
+142.1.127.107
+
+
+1. RESTART THE WEB APPLICATION
+------------------------------
+
+Restart the web Deployment without deleting the Deployment or its Service:
+
+kubectl -n cita-wiki rollout restart deployment/new-citawiki
+
+kubectl -n cita-wiki rollout status deployment/new-citawiki --timeout=300s
+
+To restart the database Deployment instead:
+
+kubectl -n cita-wiki rollout restart deployment/new-citawiki-db
+
+kubectl -n cita-wiki rollout status deployment/new-citawiki-db --timeout=300s
+
+
+2. TAKE THE TEST SITE OFFLINE TEMPORARILY
+-----------------------------------------
+
+Delete only the new web LoadBalancer Service. The web and database
+Deployments keep running, but public access through 142.1.127.107 stops.
+
+kubectl -n cita-wiki delete service new-citawiki
+
+Restore the Service later:
+
+kubectl apply -f /k8s/configs/new-citawiki/web-service.yaml
+
+Check the Service:
+
+kubectl -n cita-wiki get service new-citawiki
+
+The Service requests IP 142.1.127.107. MetalLB must still have that
+address available for it to be assigned again.
+
+
+3. RECREATE A DELETED DEPLOYMENT
+--------------------------------
+
+If only the web Deployment was deleted, recreate it:
+
+kubectl apply -f /k8s/configs/new-citawiki/web-deployment.yaml
+
+kubectl -n cita-wiki rollout status deployment/new-citawiki --timeout=300s
+
+If only the database Deployment was deleted, recreate it:
+
+kubectl apply -f /k8s/configs/new-citawiki/db-deployment.yaml
+
+kubectl -n cita-wiki rollout status deployment/new-citawiki-db --timeout=300s
+
+The existing PVCs and referenced Secrets must still exist. The database
+Deployment must reconnect to the existing new-citawiki-db-pvc.
+
+Check the resources after recovery:
+
+kubectl -n cita-wiki get deployment,service,pods,pvc
+
+If both Deployments or their Services need to be restored, apply the
+Kustomize configuration:
+
+cd /k8s/configs/new-citawiki
+
+kubectl apply -k .
+
+This Kustomize configuration includes the web Deployment and Service,
+and the database Deployment and Service. It excludes both PVC manifests.
+
+
+4. PERMANENTLY REMOVE THE TEST WEB APPLICATION
+----------------------------------------------
+
+Only do this when intentionally removing the new web application and its
+public Service. This does not delete the database Deployment, database
+Service, PVCs, ConfigMaps, or Secrets.
+
+kubectl -n cita-wiki delete deployment new-citawiki
+
+kubectl -n cita-wiki delete service new-citawiki
+
+To recreate the web application later:
+
+kubectl apply -f /k8s/configs/new-citawiki/web-deployment.yaml
+
+kubectl apply -f /k8s/configs/new-citawiki/web-service.yaml
+
+Verify recovery:
+
+kubectl -n cita-wiki rollout status deployment/new-citawiki --timeout=300s
+
+kubectl -n cita-wiki get deployment,service,pods
+
+
+IMPORTANT DATA-PROTECTION NOTES
+===============================
+
+1. Do not delete new-citawiki-files-pvc or new-citawiki-db-pvc during
+   routine restarts, updates, or Deployment recovery.
+
+2. The PVCs contain persistent wiki files and database data. A PVC
+   manifest describes a storage request; it is not a backup of the data.
+   Recreating a deleted PVC may provision an empty volume.
+
+3. Keep verified SQL dumps and backups of the underlying wiki files
+   separately from the Kubernetes manifests.
+
+4. Do not delete or modify the production cita-wiki Deployment,
+   production Service, or production PVCs when working on new-citawiki.
+
+5. Production uses public IP 142.1.127.104. The new test deployment
+   uses public IP 142.1.127.107.
+
+6. Before applying saved manifests, verify that required ConfigMaps and
+   Secrets still exist. Review configuration changes before applying them.
+
+7. The database image in db-deployment.yaml is:
+   docker.io/citadockerhub/mariadb:11.4.13-ubu2404-cita1
+
+8. The database Deployment references the Secret new-citawiki-db-secret,
+   key root_password. The web Deployment references the application
+   Secret new-citawiki-app-secret, key password.
+
+9. A successful Kubernetes rollout does not by itself prove that the
+   wiki works correctly. Check pod status, database connectivity, Apache
+   configuration, and wiki page responses after recovery.
+
+10. Deleting a Deployment does not normally delete its PVCs, but deleting
+    a PVC may endanger access to the persistent data. Never delete the
+    PVCs as a routine troubleshooting step.

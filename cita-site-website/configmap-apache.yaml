@@ -5,6 +5,8 @@ metadata:
   namespace: cita-site-website
 data:
   site.cita.utoronto.ca.conf: |
+    Listen 443 https
+
     <VirtualHost *:80>
         ServerName site.cita.utoronto.ca
 

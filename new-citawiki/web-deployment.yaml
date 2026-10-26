@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: new-citawiki
+  namespace: cita-wiki
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: new-citawiki
+  template:
+    metadata:
+      labels:
+        app: new-citawiki
+    spec:
+      terminationGracePeriodSeconds: 60
+      imagePullSecrets:
+        - name: dockerhub-credential
+      containers:
+        - name: web
+          image: docker.io/citadockerhub/mediawiki_k8s:1.43.11-cita1-php8.3.36
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args: ["a2enmod ssl && exec apache2-foreground"]
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: https
+              containerPort: 443
+              protocol: TCP
+          env:
+            - name: CITAWIKI_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: new-citawiki-app-secret
+                  key: password
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 1500Mi
+          volumeMounts:
+            - name: wiki-files
+              mountPath: /var/www
+            - name: apache2-certs-keys
+              mountPath: /etc/apache2/ssl
+            - name: apache2-certs-keys
+              mountPath: /etc/ssl/certs
+            - name: apache-vhost-config
+              mountPath: /etc/apache2/sites-enabled
+            - name: configmap-php
+              mountPath: /usr/local/etc/php
+            - name: postfix-main-cf
+              mountPath: /etc/postfix/main.cf
+              subPath: main.cf
+            - name: configmap-php-confd
+              mountPath: /usr/local/etc/php/conf.d
+            - name: malvarezwiki-data
+              mountPath: /mnt/raid-project
+            - name: malvarezwiki-data
+              mountPath: /fs/lustre/project
+      volumes:
+        - name: wiki-files
+          persistentVolumeClaim:
+            claimName: new-citawiki-files-pvc
+        - name: apache2-certs-keys
+          secret:
+            secretName: apache2-certs-keys
+        - name: apache-vhost-config
+          configMap:
+            name: apache-vhost-config
+        - name: configmap-php
+          configMap:
+            name: new-citawiki-php
+        - name: configmap-php-confd
+          configMap:
+            name: configmap-php-confd
+        - name: postfix-main-cf
+          configMap:
+            name: postfix-main-cf
+        - name: malvarezwiki-data
+          nfs:
+            server: 128.100.76.92
+            path: /mnt/raid-project
