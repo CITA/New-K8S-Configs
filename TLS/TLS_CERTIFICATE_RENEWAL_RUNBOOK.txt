@@ -1,275 +1,437 @@
-CITA Kubernetes Annual TLS Certificate Renewal Runbook
+CITA NEW KUBERNETES - ANNUAL TLS CERTIFICATE RENEWAL RUNBOOK
+==========================================================
+Updated: October 27, 2026
 
-Purpose
+PURPOSE
 -------
-Use this procedure when the shared *.cita.utoronto.ca TLS certificate is renewed.
+Renew the shared *.cita.utoronto.ca TLS certificate once and deploy its
+complete certificate chain to all SIX applications in the NEW Kubernetes
+cluster (vma). This runbook does NOT update the old production pdf-ns cluster.
 
-Applications currently using the shared certificate:
+Application    Namespace       Deployment       VIP             TLS Secret
+-----------    ---------       ----------       ---             ----------
+Webmail        cita-webmail    cita-webmail     142.1.127.101   apache2-certs-keys
+Forms          cita-forms      cita-forms       142.1.127.102   nginx-certs-keys
+PDF / iCAT     cita-pdf        cita-pdf         142.1.127.103   nginx-certs-keys
+Wiki           cita-wiki       new-citawiki     142.1.127.107   apache2-certs-keys
+Indico         cita-indico     cita-indico      142.1.127.105   nginx-certs-keys
+Website        cita-site-website cita-site-website 142.1.127.106 cita-site-tls
 
-  cita-webmail  | cita-webmail | 142.1.127.101 | apache2-certs-keys
-  cita-forms    | cita-forms   | 142.1.127.102 | nginx-certs-keys
-  cita-wiki     | cita-wiki    | 142.1.127.104 | apache2-certs-keys
+Wiki HTTPS names: adminwiki.cita.utoronto.ca, wiki.cita.utoronto.ca,
+                 mocks.cita.utoronto.ca, eor.cita.utoronto.ca.
+Note: 142.1.127.104 belongs to the older cita-wiki service, NOT new-citawiki.
 
-The Wiki Secret is used by four HTTPS sites:
-  adminwiki.cita.utoronto.ca
-  eor.cita.utoronto.ca
-  wiki.cita.utoronto.ca
-  mocks.cita.utoronto.ca
+All commands below run on vma unless otherwise noted. /k8s is a symlink to
+/root/k8s. Verify the current deployments, service VIPs and certificate
+issuer before every annual renewal; these may change.
 
-1. BACK UP THE CURRENT CERTIFICATE
+1. BACK UP SHARED CERTIFICATE FILES
 -----------------------------------
-
-  cd /root/k8s/configs
+  cd /k8s/configs
   BACKUP="TLS-backup-$(date +%Y%m%d-%H%M%S)"
-  mkdir -p "$BACKUP"
-
-  cp -a TLS/cita-wildcard.crt "$BACKUP/"
-  cp -a TLS/cita-wildcard.key "$BACKUP/"
-  cp -a TLS/STAR_cita_utoronto_ca.ca-bundle "$BACKUP/"
-
-  chown root:root "$BACKUP"/*
+  mkdir -m 700 "$BACKUP"
+  cp -a TLS/cita-wildcard.crt TLS/cita-wildcard.key \
+        TLS/STAR_cita_utoronto_ca.ca-bundle "$BACKUP/"
+  [ ! -f TLS/fullchain.pem ] || cp -a TLS/fullchain.pem "$BACKUP/"
   chmod 600 "$BACKUP/cita-wildcard.key"
-  chmod 644 "$BACKUP/cita-wildcard.crt"
-  chmod 644 "$BACKUP/STAR_cita_utoronto_ca.ca-bundle"
-
   ls -l "$BACKUP"
 
-Keep this backup until all applications have been renewed and verified.
+Keep the backup securely until all six applications are verified.
 
-2. INSTALL AND VALIDATE THE RENEWED CERTIFICATE
+2. INSTALL AND CHECK RENEWED CERTIFICATE
+----------------------------------------
+Copy the renewed files to:
+  /k8s/configs/TLS/cita-wildcard.crt
+  /k8s/configs/TLS/cita-wildcard.key
+  /k8s/configs/TLS/STAR_cita_utoronto_ca.ca-bundle
+
+  cd /k8s/configs/TLS
+  chmod 600 cita-wildcard.key
+  chmod 644 cita-wildcard.crt STAR_cita_utoronto_ca.ca-bundle
+  openssl x509 -in cita-wildcard.crt -noout -subject -issuer -dates
+  openssl x509 -in cita-wildcard.crt -noout -text | \
+    grep -A2 'Subject Alternative Name'
+
+Check that certificate and private key match (hashes must be identical):
+  openssl x509 -in cita-wildcard.crt -pubkey -noout | openssl sha256
+  openssl pkey -in cita-wildcard.key -pubout | openssl sha256
+
+STOP if the names, dates or key match are incorrect.
+
+3. GENERATE FULLCHAIN.PEM ONCE FOR ALL SIX APPS
 ------------------------------------------------
-Place the renewed files in:
+The existing script is:
+  /k8s/configs/TLS/generate_fullchain.per.sh
 
-  /root/k8s/configs/TLS/cita-wildcard.crt
-  /root/k8s/configs/TLS/cita-wildcard.key
-  /root/k8s/configs/TLS/STAR_cita_utoronto_ca.ca-bundle
+First inspect the NEW CA bundle; do not assume its order is unchanged:
+  cd /k8s/configs/TLS
+  openssl crl2pkcs7 -nocrl -certfile STAR_cita_utoronto_ca.ca-bundle | \
+    openssl pkcs7 -print_certs -noout
 
-Set permissions:
+The 2026 bundle order was:
+  1 USERTrust RSA Certification Authority (trusted root)
+  2 Sectigo Public Server Authentication Root R46 (cross-signed)
+  3 Sectigo Public Server Authentication CA OV R36 (issuing CA)
 
-  chown root:root /root/k8s/configs/TLS/*
-  chmod 600 /root/k8s/configs/TLS/cita-wildcard.key
-  chmod 644 /root/k8s/configs/TLS/cita-wildcard.crt
-  chmod 644 /root/k8s/configs/TLS/STAR_cita_utoronto_ca.ca-bundle
+The existing script creates the served chain in this order:
+  cita-wildcard.crt + CA #3 + CA #2
+The self-signed USERTrust root is NOT included in fullchain.pem.
 
-Check certificate:
+ONLY if the renewed bundle has the same ordering, run:
+  ./generate_fullchain.per.sh
 
-  openssl x509 -in /root/k8s/configs/TLS/cita-wildcard.crt \
-    -noout -subject -issuer -dates
+Expected:
+  3
+  cita-wildcard.crt: OK
 
-Check SANs:
+Confirm the generated chain and private key match:
+  grep -c 'BEGIN CERTIFICATE' fullchain.pem
+  openssl x509 -in fullchain.pem -pubkey -noout | openssl sha256
+  openssl pkey -in cita-wildcard.key -pubout | openssl sha256
 
-  openssl x509 -in /root/k8s/configs/TLS/cita-wildcard.crt \
-    -noout -text | grep -A2 -i "Subject Alternative Name"
+Expected count: 3; the two hashes must match. STOP if any check fails.
+If the issuer or bundle order changes, update the generation script and
+validate the new chain before continuing.
 
-Check certificate/private-key match:
+4. CITA-WEBMAIL (APACHE)
+-----------------------
+Namespace: cita-webmail; deployment: cita-webmail; container: web
+VIP: 142.1.127.101; HTTPS name: webmail.cita.utoronto.ca
+Config directory: /k8s/configs/cita-webmail
+Secret: apache2-certs-keys
 
-  openssl x509 -noout -modulus \
-    -in /root/k8s/configs/TLS/cita-wildcard.crt | openssl sha256
+Apache configuration (already installed; do not change for renewal):
+  SSLCertificateFile /etc/apache2/ssl/cita-wildcard.crt
+  SSLCertificateKeyFile /etc/apache2/ssl/cita-wildcard.key
 
-  openssl rsa -noout -modulus \
-    -in /root/k8s/configs/TLS/cita-wildcard.key | openssl sha256
+/k8s/configs/cita-webmail/apache-certs-keys.sh must create these Secret keys:
+  --from-file=cita-wildcard.crt="$TLS_DIR/fullchain.pem"
+  --from-file=cita-wildcard.key="$TLS_DIR/cita-wildcard.key"
+  --from-file=STAR_cita_utoronto_ca.ca-bundle="$TLS_DIR/STAR_cita_utoronto_ca.ca-bundle"
 
-The two SHA-256 values must be identical. If they differ, stop.
+Keep the CA bundle key: Roundcube mounts it for IMAP/SMTP verification.
 
-3. RENEW CITA-WEBMAIL
----------------------
-Namespace: cita-webmail
-Deployment: cita-webmail
-Hostname: cita-webmail.cita.utoronto.ca
-VIP: 142.1.127.101
-TLS Secret: apache2-certs-keys
-
-Back up the current Secret:
-
-  mkdir -p /root/k8s/configs/cita-webmail/tls-backup
+Back up Secret and update:
+  cd /k8s/configs/cita-webmail
   kubectl -n cita-webmail get secret apache2-certs-keys -o yaml \
-    > /root/k8s/configs/cita-webmail/tls-backup/apache2-certs-keys-$(date +%Y%m%d-%H%M%S).yaml
-  chmod 600 /root/k8s/configs/cita-webmail/tls-backup/*.yaml
+    > /root/apache2-certs-keys-webmail-backup.yaml
+  chmod 600 /root/apache2-certs-keys-webmail-backup.yaml
+  ./apache-certs-keys.sh
 
-Update the Secret:
-
-  kubectl -n cita-webmail create secret generic apache2-certs-keys \
-    --from-file=cita-wildcard.crt=/root/k8s/configs/TLS/cita-wildcard.crt \
-    --from-file=cita-wildcard.key=/root/k8s/configs/TLS/cita-wildcard.key \
-    --from-file=STAR_cita_utoronto_ca.ca-bundle=/root/k8s/configs/TLS/STAR_cita_utoronto_ca.ca-bundle \
-    --dry-run=client -o yaml | kubectl apply -f -
-
-Restart and wait:
-
-  kubectl -n cita-webmail rollout restart deployment/cita-webmail
-  kubectl -n cita-webmail rollout status deployment/cita-webmail --timeout=180s
-
-Wait for 2/2 Running.
-
-Verify certificate in the Pod:
-
+Wait until the mounted file contains 3 certificates:
   kubectl -n cita-webmail exec deploy/cita-webmail -c web -- \
-    openssl x509 -in /etc/apache2/ssl/cita-wildcard.crt \
-    -noout -subject -issuer -dates
+    grep -c 'BEGIN CERTIFICATE' /etc/apache2/ssl/cita-wildcard.crt
 
-Verify certificate served on HTTPS:
+Then test and gracefully reload Apache (do NOT restart the DB pod):
+  kubectl -n cita-webmail exec deploy/cita-webmail -c web -- apache2ctl configtest
+  kubectl -n cita-webmail exec deploy/cita-webmail -c web -- apache2ctl graceful
 
-  echo | openssl s_client \
-    -connect cita-webmail.cita.utoronto.ca:443 \
-    -servername cita-webmail.cita.utoronto.ca 2>/dev/null | \
-    openssl x509 -noout -subject -issuer -dates
+Verify against the new-cluster VIP (not whatever public DNS resolves to):
+  echo | openssl s_client -connect 142.1.127.101:443 \
+    -servername webmail.cita.utoronto.ca -showcerts 2>/dev/null | \
+    grep -c 'BEGIN CERTIFICATE'
+  echo | openssl s_client -connect 142.1.127.101:443 \
+    -servername webmail.cita.utoronto.ca \
+    -verify_hostname webmail.cita.utoronto.ca 2>&1 | \
+    grep 'Verify return code'
+  curl -I --resolve webmail.cita.utoronto.ca:443:142.1.127.101 \
+    https://webmail.cita.utoronto.ca/
 
-Verify:
+Expected: 3 certificates, Verify return code: 0 (ok), HTTP response.
 
-  curl -skI https://cita-webmail.cita.utoronto.ca/
-
-Then open the site in a browser.
-
-4. RENEW CITA-FORMS
--------------------
-Namespace: cita-forms
-Deployment: cita-forms
-Hostname: cita-forms.cita.utoronto.ca
+5. CITA-FORMS (NGINX)
+---------------------
+Namespace: cita-forms; deployment: cita-forms; container: nginx
 VIP: 142.1.127.102
-TLS Secret: nginx-certs-keys
+Config directory: /k8s/configs/forms
+Secret: nginx-certs-keys
 
-Back up the current Secret:
+Nginx configuration (already installed; do not change for renewal):
+  ssl_certificate /etc/nginx/ssl/fullchain.pem;
+  ssl_certificate_key /etc/nginx/ssl/cita-wildcard.key;
 
-  mkdir -p /root/k8s/configs/cita-forms/tls-backup
+/k8s/configs/forms/nginx-certs-keys.sh must create these Secret keys:
+  --from-file=fullchain.pem="$TLS_DIR/fullchain.pem"
+  --from-file=cita-wildcard.key="$TLS_DIR/cita-wildcard.key"
+
+Back up Secret and update:
+  cd /k8s/configs/forms
   kubectl -n cita-forms get secret nginx-certs-keys -o yaml \
-    > /root/k8s/configs/cita-forms/tls-backup/nginx-certs-keys-$(date +%Y%m%d-%H%M%S).yaml
-  chmod 600 /root/k8s/configs/cita-forms/tls-backup/*.yaml
+    > /root/nginx-certs-keys-forms-backup.yaml
+  chmod 600 /root/nginx-certs-keys-forms-backup.yaml
+  ./nginx-certs-keys.sh
 
-Update the Secret:
-
-  kubectl -n cita-forms create secret generic nginx-certs-keys \
-    --from-file=cita-wildcard.crt=/root/k8s/configs/TLS/cita-wildcard.crt \
-    --from-file=cita-wildcard.key=/root/k8s/configs/TLS/cita-wildcard.key \
-    --dry-run=client -o yaml | kubectl apply -f -
-
-Restart and wait:
-
-  kubectl -n cita-forms rollout restart deployment/cita-forms
-  kubectl -n cita-forms rollout status deployment/cita-forms --timeout=180s
-
-Wait for 3/3 Running.
-
-Verify certificate in the Pod:
-
+Wait for mounted certificate and confirm active Nginx configuration:
   kubectl -n cita-forms exec deploy/cita-forms -c nginx -- \
-    openssl x509 -in /etc/nginx/ssl/cita-wildcard.crt \
-    -noout -subject -issuer -dates
+    grep -c 'BEGIN CERTIFICATE' /etc/nginx/ssl/fullchain.pem
+  kubectl -n cita-forms exec deploy/cita-forms -c nginx -- \
+    nginx -T 2>&1 | grep ssl_certificate
 
-Verify certificate served on HTTPS:
+Test and reload:
+  kubectl -n cita-forms exec deploy/cita-forms -c nginx -- nginx -t
+  kubectl -n cita-forms exec deploy/cita-forms -c nginx -- nginx -s reload
 
-  echo | openssl s_client \
-    -connect cita-forms.cita.utoronto.ca:443 \
-    -servername cita-forms.cita.utoronto.ca 2>/dev/null | \
-    openssl x509 -noout -subject -issuer -dates
+Confirm the configured Forms HTTPS hostname in Nginx before testing:
+  kubectl -n cita-forms exec deploy/cita-forms -c nginx -- \
+    nginx -T 2>&1 | grep server_name
 
-Verify:
+Set HOST to that exact hostname, then verify against VIP 142.1.127.102:
+  HOST=cita-forms.cita.utoronto.ca
+  echo | openssl s_client -connect 142.1.127.102:443 \
+    -servername "$HOST" -showcerts 2>/dev/null | grep -c 'BEGIN CERTIFICATE'
+  echo | openssl s_client -connect 142.1.127.102:443 \
+    -servername "$HOST" -verify_hostname "$HOST" 2>&1 | \
+    grep 'Verify return code'
+  curl -I --resolve "$HOST:443:142.1.127.102" "https://$HOST/"
 
-  curl -skI https://cita-forms.cita.utoronto.ca/
+Expected: 3 certificates, Verify return code: 0 (ok), HTTP response.
+Replace HOST if the actual server_name differs from the example above.
 
-Then open the site in a browser.
+6. CITA-PDF / ICAT (NGINX)
+--------------------------
+Namespace: cita-pdf; deployment: cita-pdf; container: nginx
+VIP: 142.1.127.103; HTTPS name: icat.cita.utoronto.ca
+Config directory: /k8s/configs/cita-pdf
+Secret: nginx-certs-keys
 
-5. RENEW CITA-WIKI
-------------------
-Namespace: cita-wiki
-Deployment: cita-wiki
-VIP: 142.1.127.104
-TLS Secret: apache2-certs-keys
+Nginx configuration (already installed; do not change for renewal):
+  ssl_certificate /etc/nginx/ssl/fullchain.pem;
+  ssl_certificate_key /etc/nginx/ssl/cita-wildcard.key;
 
-Hostnames:
-  adminwiki.cita.utoronto.ca
-  eor.cita.utoronto.ca
-  wiki.cita.utoronto.ca
-  mocks.cita.utoronto.ca
+/k8s/configs/cita-pdf/nginx-certs-keys.sh must create these Secret keys:
+  --from-file=fullchain.pem="$TLS_DIR/fullchain.pem"
+  --from-file=cita-wildcard.key="$TLS_DIR/cita-wildcard.key"
 
-All four Wiki HTTPS vhosts use the same Secret.
+Back up Secret and update:
+  cd /k8s/configs/cita-pdf
+  kubectl -n cita-pdf get secret nginx-certs-keys -o yaml \
+    > /root/nginx-certs-keys-pdf-backup.yaml
+  chmod 600 /root/nginx-certs-keys-pdf-backup.yaml
+  ./nginx-certs-keys.sh
 
-Back up the current Secret:
+Wait for mounted certificate and confirm active Nginx configuration:
+  kubectl -n cita-pdf exec deploy/cita-pdf -c nginx -- \
+    grep -c 'BEGIN CERTIFICATE' /etc/nginx/ssl/fullchain.pem
+  kubectl -n cita-pdf exec deploy/cita-pdf -c nginx -- \
+    nginx -T 2>&1 | grep ssl_certificate
 
-  mkdir -p /root/k8s/configs/cita-wiki/tls-backup
+Test and reload:
+  kubectl -n cita-pdf exec deploy/cita-pdf -c nginx -- nginx -t
+  kubectl -n cita-pdf exec deploy/cita-pdf -c nginx -- nginx -s reload
+
+Verify the NEW cluster explicitly (public DNS may still point to goat):
+  echo | openssl s_client -connect 142.1.127.103:443 \
+    -servername icat.cita.utoronto.ca -showcerts 2>/dev/null | \
+    grep -c 'BEGIN CERTIFICATE'
+  echo | openssl s_client -connect 142.1.127.103:443 \
+    -servername icat.cita.utoronto.ca \
+    -verify_hostname icat.cita.utoronto.ca 2>&1 | \
+    grep 'Verify return code'
+  curl -I --resolve icat.cita.utoronto.ca:443:142.1.127.103 \
+    https://icat.cita.utoronto.ca/
+
+Expected: 3 certificates, Verify return code: 0 (ok), HTTP response.
+DO NOT change public DNS as part of certificate renewal.
+
+7. NEW-CITAWIKI (APACHE; FOUR HTTPS VHOSTS)
+--------------------------------------------
+Namespace: cita-wiki; deployment: new-citawiki; container: web
+VIP: 142.1.127.107 (NOT older service 142.1.127.104)
+Config directory: /k8s/configs/new-citawiki
+Secret: apache2-certs-keys
+
+All four HTTPS vhosts use:
+  SSLCertificateFile /etc/apache2/ssl/cita-wildcard.crt
+  SSLCertificateKeyFile /etc/apache2/ssl/cita-wildcard.key
+
+/k8s/configs/new-citawiki/apache-certs-keys.sh must create these keys:
+  --from-file=cita-wildcard.crt="$TLS_DIR/fullchain.pem"
+  --from-file=cita-wildcard.key="$TLS_DIR/cita-wildcard.key"
+  --from-file=STAR_cita_utoronto_ca.ca-bundle="$TLS_DIR/STAR_cita_utoronto_ca.ca-bundle"
+
+Back up Secret and update:
+  cd /k8s/configs/new-citawiki
   kubectl -n cita-wiki get secret apache2-certs-keys -o yaml \
-    > /root/k8s/configs/cita-wiki/tls-backup/apache2-certs-keys-$(date +%Y%m%d-%H%M%S).yaml
-  chmod 600 /root/k8s/configs/cita-wiki/tls-backup/*.yaml
+    > /root/apache2-certs-keys-wiki-backup.yaml
+  chmod 600 /root/apache2-certs-keys-wiki-backup.yaml
+  ./apache-certs-keys.sh
 
-Update the Secret:
+Wait for mounted certificate, test, and gracefully reload Apache:
+  kubectl -n cita-wiki exec deploy/new-citawiki -c web -- \
+    grep -c 'BEGIN CERTIFICATE' /etc/apache2/ssl/cita-wildcard.crt
+  kubectl -n cita-wiki exec deploy/new-citawiki -c web -- apache2ctl configtest
+  kubectl -n cita-wiki exec deploy/new-citawiki -c web -- apache2ctl graceful
 
-  kubectl -n cita-wiki create secret generic apache2-certs-keys \
-    --from-file=cita-wildcard.crt=/root/k8s/configs/TLS/cita-wildcard.crt \
-    --from-file=cita-wildcard.key=/root/k8s/configs/TLS/cita-wildcard.key \
-    --from-file=STAR_cita_utoronto_ca.ca-bundle=/root/k8s/configs/TLS/STAR_cita_utoronto_ca.ca-bundle \
-    --dry-run=client -o yaml | kubectl apply -f -
+Check Apache's actual vhosts:
+  kubectl -n cita-wiki exec deploy/new-citawiki -c web -- \
+    apache2ctl -S 2>&1 | grep -E 'namevhost|default server'
 
-Restart and wait:
-
-  kubectl -n cita-wiki rollout restart deployment/cita-wiki
-  kubectl -n cita-wiki rollout status deployment/cita-wiki --timeout=180s
-
-Wait for 2/2 Running.
-
-Verify certificate in the Pod:
-
-  kubectl -n cita-wiki exec deploy/cita-wiki -c web -- \
-    openssl x509 -in /etc/apache2/ssl/cita-wildcard.crt \
-    -noout -subject -issuer -dates
-
-Verify the certificate served by Apache for all four names:
-
-  for h in adminwiki.cita.utoronto.ca eor.cita.utoronto.ca \
-           wiki.cita.utoronto.ca mocks.cita.utoronto.ca; do
-      echo "===== $h ====="
-      echo | openssl s_client -connect "$h:443" -servername "$h" 2>/dev/null | \
-        openssl x509 -noout -subject -issuer -dates
+Verify all FOUR HTTPS hostnames at the new-cluster VIP:
+  for HOST in adminwiki.cita.utoronto.ca wiki.cita.utoronto.ca \
+              mocks.cita.utoronto.ca eor.cita.utoronto.ca; do
+    echo "===== $HOST ====="
+    echo | openssl s_client -connect 142.1.127.107:443 \
+      -servername "$HOST" -showcerts 2>/dev/null | \
+      grep -c 'BEGIN CERTIFICATE'
+    echo | openssl s_client -connect 142.1.127.107:443 \
+      -servername "$HOST" -verify_hostname "$HOST" 2>&1 | \
+      grep 'Verify return code'
+    curl -I --connect-timeout 5 \
+      --resolve "$HOST:443:142.1.127.107" "https://$HOST/"
   done
 
-Verify HTTPS:
+Expected for each: 3 certificates, Verify return code: 0 (ok),
+and an appropriate HTTP response.
 
-  for h in adminwiki.cita.utoronto.ca eor.cita.utoronto.ca \
-           wiki.cita.utoronto.ca mocks.cita.utoronto.ca; do
-      echo "===== $h ====="
-      curl -skI --connect-timeout 5 "https://$h/" | head -5
-  done
+8. CITA-INDICO (NGINX)
+-----------------------
+Namespace: cita-indico; deployment: cita-indico; container: nginx
+VIP: 142.1.127.105; HTTPS name: conference.cita.utoronto.ca
+Config directory: /k8s/configs/cita-indico
+Secret: nginx-certs-keys
 
-Then open all four sites in a browser.
+Existing Nginx configuration (do not change for renewal):
+  ssl_certificate /etc/nginx/ssl/cita-wildcard.crt;
+  ssl_certificate_key /etc/nginx/ssl/cita-wildcard.key;
 
-6. FINAL CHECKLIST
-------------------
-[ ] Previous shared certificate files backed up.
-[ ] New certificate subject/issuer/dates verified.
-[ ] SANs verified.
+/k8s/configs/cita-indico/nginx-certs-keys.sh must create these Secret keys:
+  --from-file=cita-wildcard.crt="$TLS_DIR/fullchain.pem"
+  --from-file=cita-wildcard.key="$TLS_DIR/cita-wildcard.key"
+  --from-file=STAR_cita_utoronto_ca.ca-bundle="$TLS_DIR/STAR_cita_utoronto_ca.ca-bundle"
+
+Back up Secret and update:
+  cd /k8s/configs/cita-indico
+  kubectl -n cita-indico get secret nginx-certs-keys -o yaml \
+    > /root/nginx-certs-keys-indico-backup.yaml
+  chmod 600 /root/nginx-certs-keys-indico-backup.yaml
+  ./nginx-certs-keys.sh
+
+Wait until mounted certificate count is 3, then test and reload Nginx:
+  kubectl -n cita-indico exec deploy/cita-indico -c nginx -- \
+    grep -c 'BEGIN CERTIFICATE' /etc/nginx/ssl/cita-wildcard.crt
+  kubectl -n cita-indico exec deploy/cita-indico -c nginx -- nginx -t
+  kubectl -n cita-indico exec deploy/cita-indico -c nginx -- nginx -s reload
+
+Verify the new-cluster VIP and HTTPS GET (HEAD may return HTTP 400):
+  echo | openssl s_client -connect 142.1.127.105:443 \
+    -servername conference.cita.utoronto.ca \
+    -verify_hostname conference.cita.utoronto.ca -showcerts 2>&1 | \
+    grep -E '^[[:space:]]*[0-9]+ s:|Verify return code'
+  curl -sS -o /dev/null -w 'HTTP Status: %{http_code}\n' \
+    --resolve conference.cita.utoronto.ca:443:142.1.127.105 \
+    https://conference.cita.utoronto.ca/
+
+Expected: 3 served certificates, Verify return code: 0 (ok), HTTP 200
+(or another appropriate application response). No Indico/Celery/DB restart.
+
+9. CITA WEBSITE (APACHE HTTPD / WORDPRESS)
+------------------------------------------
+Namespace: cita-site-website; deployment: cita-site-website; container: web
+VIP: 142.1.127.106; HTTPS name: site.cita.utoronto.ca
+Config directory: /k8s/configs/cita-site-website
+Secret: cita-site-tls (Opaque)
+
+Current Apache configuration (already updated):
+  SSLCertificateFile /etc/httpd/tls/tls.crt
+  SSLCertificateKeyFile /etc/httpd/tls/tls.key
+
+Do NOT restore the old SSLCertificateChainFile directive. The tls.crt
+Secret key contains fullchain.pem, including the necessary intermediates.
+
+/k8s/configs/cita-site-website/apache-certs-keys.sh must create:
+  --from-file=tls.crt="$TLS_DIR/fullchain.pem"
+  --from-file=tls.key="$TLS_DIR/cita-wildcard.key"
+  --from-file=ca-bundle.crt="$TLS_DIR/STAR_cita_utoronto_ca.ca-bundle"
+
+IMPORTANT: secret-tls.yaml was removed from kustomization.yaml. Do NOT
+re-add it or apply the obsolete YAML: it contains old base64 TLS data and
+would overwrite the script-managed Secret. Keep old backups protected.
+
+Back up Secret and update:
+  cd /k8s/configs/cita-site-website
+  kubectl -n cita-site-website get secret cita-site-tls -o yaml \
+    > /root/cita-site-tls-backup.yaml
+  chmod 600 /root/cita-site-tls-backup.yaml
+  ./apache-certs-keys.sh
+
+Wait for mounted certificate count to reach 3:
+  kubectl -n cita-site-website exec deploy/cita-site-website -c web -- \
+    grep -c 'BEGIN CERTIFICATE' /etc/httpd/tls/tls.crt
+
+For ordinary annual renewals, the Apache SSL paths are unchanged: do NOT
+reapply apache-config.yaml or restart the pod merely for a certificate
+change. Check and gracefully reload Apache after the Secret refresh:
+  kubectl -n cita-site-website exec deploy/cita-site-website -c web -- httpd -t
+  kubectl -n cita-site-website exec deploy/cita-site-website -c web -- \
+    httpd -k graceful
+
+ONLY if Apache configuration changes: apply apache-config.yaml and restart
+the Website deployment because the Apache ConfigMap is mounted via subPath.
+This does not restart the separate MariaDB deployment:
+  kubectl -n cita-site-website apply -f apache-config.yaml
+  kubectl -n cita-site-website rollout restart deploy/cita-site-website
+  kubectl -n cita-site-website rollout status deploy/cita-site-website \
+    --timeout=180s
+
+Verify certificate chain and HTTPS GET at the new-cluster VIP:
+  echo | openssl s_client -connect 142.1.127.106:443 \
+    -servername site.cita.utoronto.ca \
+    -verify_hostname site.cita.utoronto.ca -showcerts 2>&1 | \
+    grep -E '^[[:space:]]*[0-9]+ s:|Verify return code'
+  curl -sS -o /dev/null -w 'HTTP Status: %{http_code}\n' \
+    --resolve site.cita.utoronto.ca:443:142.1.127.106 \
+    https://site.cita.utoronto.ca/
+
+Expected: 3 certificates in leaf-to-issuer order, Verify return code:
+0 (ok), and an appropriate HTTP response (301 was observed in Oct 2026).
+
+10. FINAL CHECKLIST
+-------------------
+[ ] Shared TLS files backed up.
+[ ] Renewed wildcard subject, SANs and validity dates verified.
 [ ] Certificate and private key match.
-[ ] cita-webmail renewed and browser-tested.
-[ ] cita-forms renewed and browser-tested.
-[ ] cita-wiki renewed and all four Wiki sites browser-tested.
-[ ] All workloads are healthy.
-[ ] Previous certificate set retained for rollback.
+[ ] CA bundle order reviewed; fullchain.pem generated ONCE and verified.
+[ ] Each application's current Secret backed up.
+[ ] Webmail: 3 served certificates; trust OK; HTTPS tested.
+[ ] Forms: 3 served certificates; trust OK; HTTPS tested.
+[ ] PDF: 3 served certificates; trust OK; HTTPS tested at 142.1.127.103.
+[ ] New Wiki: all four hostnames serve 3 certificates; trust OK; HTTPS tested.
+[ ] Indico: 3 served certificates; trust OK; HTTPS GET tested.
+[ ] Website: 3 served certificates; trust OK; HTTPS GET tested.
+[ ] Website secret-tls.yaml remains excluded from kustomization.yaml.
+[ ] All application pods healthy; no unnecessary database restarts.
+[ ] Backups retained for rollback.
 
-7. ROLLBACK
------------
-If an application fails after renewal:
+11. ROLLBACK
+------------
+If renewal fails, restore the affected application's previous Secret from
+its protected backup, for example:
 
-  1. Restore the previous certificate/key/CA bundle from the saved TLS-backup directory.
-  2. Re-run that application's Secret update command.
-  3. Restart/reload the workload.
-  4. Wait for the workload to become healthy.
-  5. Verify the served certificate with openssl s_client.
-  6. Verify HTTPS and browser functionality.
+  kubectl apply -f /root/apache2-certs-keys-webmail-backup.yaml
 
-Do not delete the working Secret before rollback.
+Then wait for the mounted Secret to refresh, test Apache/Nginx configuration,
+and gracefully reload the web server. If a ConfigMap was changed, restore
+that ConfigMap separately. For Website, a changed Apache ConfigMap mounted
+with subPath requires restarting only the Website deployment. Verify the
+served certificate, HTTPS and application health. Keep the shared TLS
+backup for subsequent correction.
 
-8. ADDING FUTURE APPLICATIONS
------------------------------
-For each new HTTPS application using the shared certificate, add:
-
-  namespace
-  deployment/workload
-  hostname(s)
-  VIP
-  TLS Secret name
-  required certificate files
-  Secret update command
-  restart/reload command
-  certificate verification
-  HTTPS verification
-  browser/application test
-  rollback steps
-
-Keep the shared certificate files in /root/k8s/configs/TLS/.
+12. NOTES
+---------
+- Generate fullchain.pem once per renewal; reuse it across all six apps.
+- Webmail, Wiki and Indico store fullchain.pem CONTENT under the existing
+  Secret key cita-wildcard.crt; their SSL configuration does not change.
+- Forms and PDF use the Secret key fullchain.pem and the corresponding
+  Nginx ssl_certificate path.
+- Website stores fullchain.pem CONTENT as tls.crt, keeps tls.key and
+  ca-bundle.crt, and no longer uses SSLCertificateChainFile.
+- Webmail and Wiki retain STAR_cita_utoronto_ca.ca-bundle in their Secrets;
+  Webmail Roundcube uses it for outbound IMAP/SMTP trust verification.
+- Mounted Secret files update asynchronously; wait for 3 certificates before
+  reloading the web server. A graceful reload normally avoids pod restart.
+- ConfigMaps need not be re-applied if their SSL paths are unchanged.
+- Website's old secret-tls.yaml must not be reapplied; its Secret is now
+  managed by apache-certs-keys.sh, outside Kustomize resources.
+- Do not use curl -k to prove certificate trust; -k disables verification.
+- VIP + SNI checks distinguish the new cluster from old public DNS targets.
+- This runbook excludes the OLD production PDF deployment (pdf-ns on vm4).

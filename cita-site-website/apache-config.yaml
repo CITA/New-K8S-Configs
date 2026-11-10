@@ -1,0 +1,96 @@
+apiVersion: v1
+data:
+  site.cita.utoronto.ca.conf: |
+    Listen 443 https
+
+    <VirtualHost *:80>
+        ServerName www.cita.utoronto.ca
+
+        Redirect / https://www.cita.utoronto.ca/
+
+        ErrorLog /proc/self/fd/2
+        CustomLog /proc/self/fd/1 combined
+    </VirtualHost>
+
+    <VirtualHost *:443>
+        ServerName www.cita.utoronto.ca
+        DocumentRoot /usr/share/wordpress
+
+    #
+    # Protect WordPress from abusive multi-tag Uncode filter requests.
+    # Normal single-tag filters remain allowed.
+    #
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} ^/(awards|seminars)/$ [NC]
+    RewriteCond %{QUERY_STRING} (^|&)tax_post_tag=[^&]*(%2[Cc]|,)[^&]* [NC]
+    RewriteRule ^ - [F,L]
+
+        <Directory /usr/share/wordpress>
+            AllowOverride All
+            Require all granted
+        </Directory>
+
+        #
+        # CITA per-user web pages:
+        # https://www.cita.utoronto.ca/~username/
+        # maps to /cita/d/www/home/username/
+        #
+        # Enable CITA per-user websites.
+        UserDir enabled
+        UserDir /cita/d/www/home
+
+        <Directory /cita/d/www/home>
+            Options Indexes FollowSymLinks IncludesNoExec
+            AllowOverride All
+            Require all granted
+        </Directory>
+
+       <Directory "/cita/d/www/home">
+           Options Indexes FollowSymLinks IncludesNoExec
+           AllowOverride All
+           Require all granted
+        </Directory>
+
+        #
+        # Legacy CITA web content
+        #
+
+        Alias /HOTT/ /cita/d/www/home/asingh/HOTT/
+        Alias /Jing_memorial/ /cita/d/www/Jing_memorial/
+        Alias /recording/ /cita/d/www/recording/
+        Alias /rss/ /cita/d/www/rss/
+        Alias /Simplistics/ /cita/d/www/Simplistics/
+        Alias /webpages/ /cita/d/www/webpages/
+
+        <Directory "/cita/d/www">
+            Options Indexes FollowSymLinks
+            AllowOverride All
+            Require all granted
+        </Directory>
+
+        #
+        # Legacy CITA project websites
+        #
+
+        Alias /DHIGLS/ /cita/web-lustre/project/hp/blagrave/web/DHIGLS/
+        Alias /GHIGLS/ /cita/web-lustre/project/hp/blagrave/web/GHIGLS/
+        Alias /NCPL/ /cita/web-lustre/project/hp/NCPL/
+
+        <Directory "/cita/web-lustre/project/hp">
+            Options Indexes FollowSymLinks
+            AllowOverride All
+            Require all granted
+        </Directory>
+
+        SSLEngine on
+        SSLCertificateFile /etc/httpd/tls/tls.crt
+        SSLCertificateKeyFile /etc/httpd/tls/tls.key
+
+        ErrorLog /proc/self/fd/2
+        CustomLog /proc/self/fd/1 combined
+    </VirtualHost>
+kind: ConfigMap
+metadata:
+  annotations: {}
+  name: cita-site-apache
+  namespace: cita-site-website

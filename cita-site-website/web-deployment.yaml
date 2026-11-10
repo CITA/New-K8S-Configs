@@ -1,0 +1,151 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations: {}
+  labels:
+    app: cita-site-website
+  name: cita-site-website
+  namespace: cita-site-website
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: cita-site-website
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2026-10-26T15:23:57-04:00"
+      labels:
+        app: cita-site-website
+    spec:
+      containers:
+        - image: citadockerhub/wordpress_k8s:1.0.3
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 6
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: https
+            timeoutSeconds: 3
+          name: web
+          ports:
+            - containerPort: 80
+              name: http
+              protocol: TCP
+            - containerPort: 443
+              name: https
+              protocol: TCP
+          readinessProbe:
+            failureThreshold: 12
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            tcpSocket:
+              port: https
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              cpu: "4"
+              memory: 2Gi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/httpd/conf.d/userdir.conf
+              name: userdir-config
+              readOnly: true
+              subPath: userdir.conf
+            - mountPath: /usr/share/wordpress
+              name: wordpress
+            - mountPath: /etc/wordpress
+              name: wordpress-config
+            - mountPath: /etc/httpd/conf.d/site.cita.utoronto.ca.conf
+              name: apache-config
+              readOnly: true
+              subPath: site.cita.utoronto.ca.conf
+            - mountPath: /etc/php.d/99-cita-wordpress.ini
+              name: php-config
+              readOnly: true
+              subPath: 99-cita-wordpress.ini
+            - mountPath: /etc/httpd/tls
+              name: tls
+              readOnly: true
+            - mountPath: /cita/d/www
+              name: cita-www
+              readOnly: true
+            - mountPath: /cita/web-lustre/project
+              name: web-lustre-project
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+        - name: dockerhub-credential
+      initContainers:
+        - command:
+            - /config/generate-wp-config.sh
+          envFrom:
+            - secretRef:
+                name: cita-site-wordpress-secrets
+          image: citadockerhub/wordpress_k8s:1.0.2
+          imagePullPolicy: IfNotPresent
+          name: generate-wp-config
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /config
+              name: wordpress-config-generator
+              readOnly: true
+            - mountPath: /etc/wordpress
+              name: wordpress-config
+      nodeSelector:
+        cita.utoronto.ca/application-node: "true"
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: cita-site-userdir
+          name: userdir-config
+        - name: wordpress
+          persistentVolumeClaim:
+            claimName: cita-site-wordpress-pvc
+        - emptyDir: {}
+          name: wordpress-config
+        - configMap:
+            defaultMode: 365
+            name: cita-site-wordpress-config
+          name: wordpress-config-generator
+        - configMap:
+            defaultMode: 420
+            name: cita-site-apache
+          name: apache-config
+        - configMap:
+            defaultMode: 420
+            name: cita-site-php
+          name: php-config
+        - name: tls
+          secret:
+            defaultMode: 288
+            secretName: cita-site-tls
+        - name: cita-www
+          nfs:
+            path: /obj/www
+            server: 142.1.127.49
+        - name: web-lustre-project
+          nfs:
+            path: /fs/lustre/project
+            readOnly: true
+            server: 128.100.76.92

@@ -1,3 +1,4 @@
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -5,15 +6,21 @@ metadata:
   namespace: cita-pdf
   labels:
     app: cita-pdf
+
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
+
   selector:
     matchLabels:
       app: cita-pdf
+
   template:
     metadata:
       labels:
         app: cita-pdf
+
     spec:
       dnsPolicy: None
       dnsConfig:
@@ -38,6 +45,7 @@ spec:
         - name: db-initdb
           configMap:
             name: mysql-initdb-config
+            defaultMode: 0755
 
         - name: db-mysql-cnf
           configMap:
@@ -47,11 +55,6 @@ spec:
           secret:
             secretName: dbbackup-secret
             defaultMode: 0400
-
-        - name: dbbackup-init
-          configMap:
-            name: dbbackup-init
-            defaultMode: 0755
 
         - name: pdf-volume
           persistentVolumeClaim:
@@ -107,6 +110,7 @@ spec:
           volumeMounts:
             - name: db-initdb
               mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
 
             - name: db-mysql-cnf
               mountPath: /etc/mysql/mysql.conf.d
@@ -119,10 +123,6 @@ spec:
               mountPath: /run/secrets/dbbackup
               readOnly: true
 
-            - name: dbbackup-init
-              mountPath: /docker-entrypoint-initdb.d/dbbackup-init.sh
-              subPath: dbbackup-init.sh
-
           resources:
             limits:
               cpu: 2000m
@@ -132,7 +132,7 @@ spec:
               memory: 1Gi
 
         - name: web
-          image: citadockerhub/pdf_app_site_k8s:1.5.0
+          image: citadockerhub/pdf_app_site_k8s:1.5.2
           imagePullPolicy: Always
 
           command:
@@ -301,3 +301,4 @@ spec:
             requests:
               cpu: 2500m
               memory: 2Gi
+

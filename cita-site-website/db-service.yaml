@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations: {}
+  labels:
+    app: cita-site-mariadb
+  name: cita-site-mariadb
+  namespace: cita-site-website
+spec:
+  internalTrafficPolicy: Cluster
+  ports:
+    - name: mysql
+      port: 3306
+      protocol: TCP
+      targetPort: mysql
+  selector:
+    app: cita-site-mariadb
+  sessionAffinity: None
+  type: ClusterIP

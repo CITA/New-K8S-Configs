@@ -5,8 +5,8 @@ metadata:
   namespace: cita-forms
 data:
   DEFAULT_PUB_YEAR: "2024"
-  SURF_APPLICATION_START_TIME: "2025-12-15 00:00:00"
-  SURF_APPLICATION_END_TIME: "2026-01-30 23:59:59"
+  SURF_APPLICATION_START_TIME: "2026-12-14 00:00:00"
+  SURF_APPLICATION_END_TIME: "2027-01-29 23:59:59"
   AGM_MEETING: "2026-06-23 13:00:00"
   AGM_VOTE_DEADLINE: "2026-06-22 23:59:59"
   AGM_DEFAULT_PROXY: ""
@@ -81,7 +81,7 @@ data:
       ssl_session_cache shared:SSL:50m;
       ssl_session_tickets on;
 
-      ssl_certificate /etc/nginx/ssl/cita-wildcard.crt;
+      ssl_certificate /etc/nginx/ssl/fullchain.pem;
       ssl_certificate_key /etc/nginx/ssl/cita-wildcard.key;
 
       add_header Strict-Transport-Security "max-age=31536000" always;

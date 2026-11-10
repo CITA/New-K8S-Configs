@@ -1,0 +1,17 @@
+apiVersion: v1
+data:
+  userdir.conf: |
+    <IfModule mod_userdir.c>
+        UserDir /cita/d/www/home
+    </IfModule>
+
+    <Directory "/cita/d/www/home">
+        Options Indexes FollowSymLinks IncludesNoExec
+        AllowOverride All
+        Require all granted
+    </Directory>
+kind: ConfigMap
+metadata:
+  annotations: {}
+  name: cita-site-userdir
+  namespace: cita-site-website

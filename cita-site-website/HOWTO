@@ -1,0 +1,261 @@
+CITA PRODUCTION WEBSITE - KUBERNETES RECOVERY
+=============================================
+
+Namespace:
+
+    cita-site-website
+
+Configuration directory:
+
+    /k8s/configs/cita-site-website
+
+
+1. VALIDATE CONFIGURATION
+-------------------------
+
+cd /k8s/configs/cita-site-website
+
+kubectl kustomize . > /tmp/cita-site-website-rendered.yaml
+
+kubectl apply \
+    --dry-run=server \
+    -f /tmp/cita-site-website-rendered.yaml
+
+
+2. RE-APPLY CURRENT CONFIGURATION
+---------------------------------
+
+If the namespace exists and one or more Kubernetes objects were
+accidentally modified or deleted:
+
+cd /k8s/configs/cita-site-website
+
+kubectl apply -k .
+
+
+3. COMPLETE NAMESPACE RECOVERY
+------------------------------
+
+If the entire namespace was accidentally deleted:
+
+kubectl create namespace cita-site-website
+
+cd /k8s/configs/cita-site-website
+
+kubectl apply -k .
+
+
+4. WATCH RECOVERY
+-----------------
+
+kubectl get pods -n cita-site-website -w
+
+
+5. CHECK DATABASE
+-----------------
+
+kubectl rollout status \
+    deployment/cita-site-mariadb \
+    -n cita-site-website \
+    --timeout=120s
+
+
+6. CHECK WEBSITE
+----------------
+
+kubectl rollout status \
+    deployment/cita-site-website \
+    -n cita-site-website \
+    --timeout=120s
+
+
+7. CHECK PODS
+-------------
+
+kubectl get pods \
+    -n cita-site-website \
+    -o wide
+
+
+8. CHECK SERVICES
+-----------------
+
+kubectl get svc \
+    -n cita-site-website
+
+Expected external service:
+
+    cita-site-website-external
+
+Expected LoadBalancer IP:
+
+    142.1.127.106
+
+
+9. CHECK PVCS
+-------------
+
+kubectl get pvc \
+    -n cita-site-website
+
+Expected:
+
+    cita-site-wordpress-pvc
+    cita-site-database-pvc
+
+
+10. CHECK WORDPRESS
+-------------------
+
+WEB=$(kubectl get pod \
+    -n cita-site-website \
+    -l app=cita-site-website \
+    -o jsonpath='{.items[0].metadata.name}')
+
+kubectl exec \
+    -n cita-site-website \
+    "$WEB" \
+    -c web -- \
+    php /usr/share/wordpress/wp-cli.phar \
+    --path=/usr/share/wordpress \
+    --allow-root \
+    option get home
+
+kubectl exec \
+    -n cita-site-website \
+    "$WEB" \
+    -c web -- \
+    php /usr/share/wordpress/wp-cli.phar \
+    --path=/usr/share/wordpress \
+    --allow-root \
+    option get siteurl
+
+Expected:
+
+    https://www.cita.utoronto.ca
+
+
+11. CHECK APACHE
+----------------
+
+kubectl exec \
+    -n cita-site-website \
+    "$WEB" \
+    -c web -- \
+    apachectl configtest
+
+Expected:
+
+    Syntax OK
+
+
+12. CHECK LEGACY PROJECT MOUNT
+------------------------------
+
+kubectl exec \
+    -n cita-site-website \
+    "$WEB" \
+    -c web -- \
+    findmnt /cita/web-lustre/project
+
+
+13. PRODUCTION URL TEST
+-----------------------
+
+for URL in \
+  / \
+  /people/ \
+  /events/ \
+  /category/past-event/ \
+  /wp-login.php \
+  '/~ahajian/' \
+  /DHIGLS/ \
+  /GHIGLS/ \
+  /HOTT/ \
+  /Jing_memorial/ \
+  /NCPL/ \
+  /recording/ \
+  /rss/ \
+  /Simplistics/ \
+  /webpages/
+do
+    CODE=$(curl -k -sS \
+      -o /dev/null \
+      -w '%{http_code}' \
+      "https://www.cita.utoronto.ca${URL}")
+
+    printf '%-38s HTTP %s\n' "$URL" "$CODE"
+done
+
+Expected:
+
+    HTTP 200 for all URLs.
+
+
+14. PEOPLE SEARCH TEST
+----------------------
+
+curl -ks \
+  'https://www.cita.utoronto.ca/?s=Jay&cita_people=1' |
+sed 's/></>\n</g' |
+grep -A1 'class="t-entry-title' |
+grep '<a ' |
+sed -E 's/<[^>]+>//g'
+
+Expected:
+
+    Jay Li
+    Jay Pratt
+
+
+15. IMPORTANT DATA NOTE
+-----------------------
+
+The YAML files restore Kubernetes objects and configuration.
+
+They do NOT contain the WordPress files or MariaDB database.
+
+WordPress and MariaDB data reside on NFS-backed persistent volumes.
+
+Do not delete the underlying NFS PVC data when recovering Kubernetes
+objects.
+
+
+16. SECRETS
+-----------
+
+The following files contain sensitive data:
+
+    secret-mariadb-root.yaml
+    secret-wordpress.yaml
+    secret-tls.yaml
+    secret-dockerhub.yaml
+
+They must remain readable only by root.
+
+Check with:
+
+    ls -l secret-*.yaml
+
+Expected permissions:
+
+    -rw-------
+
+
+17. PRODUCTION / STANDBY DIRECTION
+----------------------------------
+
+Production:
+
+    Kubernetes cita-site-website
+
+Standby:
+
+    ant.cita.utoronto.ca
+
+Any future synchronization must be:
+
+    Kubernetes production -> ant standby
+
+Do NOT synchronize ant -> Kubernetes unless intentionally performing
+a recovery from ant.

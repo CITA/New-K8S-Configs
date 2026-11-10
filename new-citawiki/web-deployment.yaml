@@ -71,7 +71,7 @@ spec:
             secretName: apache2-certs-keys
         - name: apache-vhost-config
           configMap:
-            name: apache-vhost-config
+            name: new-apache-vhost-config
         - name: configmap-php
           configMap:
             name: new-citawiki-php

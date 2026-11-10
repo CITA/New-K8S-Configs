@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    metallb.io/ip-allocated-from-pool: public-apps-pool
+  labels:
+    app: cita-site-website
+  name: cita-site-website-external
+  namespace: cita-site-website
+spec:
+  allocateLoadBalancerNodePorts: true
+  externalTrafficPolicy: Cluster
+  internalTrafficPolicy: Cluster
+  loadBalancerIP: 142.1.127.106
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: http
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: https
+  selector:
+    app: cita-site-website
+  sessionAffinity: None
+  type: LoadBalancer

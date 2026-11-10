@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cita-site-website
+resources:
+  - web-pvc.yaml
+  - db-pvc.yaml
+  - secret-mariadb-root.yaml
+  - secret-wordpress.yaml
+  - secret-dockerhub.yaml
+  - apache-config.yaml
+  - php-config.yaml
+  - userdir-config.yaml
+  - wordpress-config.yaml
+  - db-service.yaml
+  - db-deployment.yaml
+  - web-service.yaml
+  - web-external-service.yaml
+  - web-deployment.yaml
