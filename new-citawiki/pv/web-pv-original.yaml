@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    pv.kubernetes.io/provisioned-by: nfs.csi.k8s.io
+    volume.kubernetes.io/provisioner-deletion-secret-name: ""
+    volume.kubernetes.io/provisioner-deletion-secret-namespace: ""
+  creationTimestamp: "2026-10-23T00:45:47Z"
+  finalizers:
+  - kubernetes.io/pv-protection
+  name: pvc-786b3ac0-fb4e-4c48-bfb2-953812a885ec
+  resourceVersion: "11995221"
+  uid: 9bebaf76-c427-450b-b732-cff5e8f92b92
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 50Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: new-citawiki-files-pvc
+    namespace: cita-wiki
+    resourceVersion: "11995212"
+    uid: 786b3ac0-fb4e-4c48-bfb2-953812a885ec
+  csi:
+    driver: nfs.csi.k8s.io
+    volumeAttributes:
+      csi.storage.k8s.io/pv/name: pvc-786b3ac0-fb4e-4c48-bfb2-953812a885ec
+      csi.storage.k8s.io/pvc/name: new-citawiki-files-pvc
+      csi.storage.k8s.io/pvc/namespace: cita-wiki
+      server: nfs.cita.utoronto.ca
+      share: /obj/k8s/pvcs
+      storage.kubernetes.io/csiProvisionerIdentity: 1788288755414-6142-nfs.csi.k8s.io
+      subDir: cita-wiki-new-citawiki-files-pvc-pvc-786b3ac0-fb4e-4c48-bfb2-953812a885ec
+    volumeHandle: nfs.cita.utoronto.ca#obj/k8s/pvcs#cita-wiki-new-citawiki-files-pvc-pvc-786b3ac0-fb4e-4c48-bfb2-953812a885ec#pvc-786b3ac0-fb4e-4c48-bfb2-953812a885ec#
+  mountOptions:
+  - nfsvers=4.1
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-cita
+  volumeMode: Filesystem
+status:
+  lastPhaseTransitionTime: "2026-10-23T00:45:47Z"
+  phase: Bound

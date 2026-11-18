@@ -132,7 +132,7 @@ spec:
               memory: 1Gi
 
         - name: web
-          image: citadockerhub/pdf_app_site_k8s:1.5.2
+          image: citadockerhub/pdf_app_site_k8s:1.5.3
           imagePullPolicy: Always
 
           command:

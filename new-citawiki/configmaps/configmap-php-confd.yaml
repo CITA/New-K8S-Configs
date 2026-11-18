@@ -1,0 +1,33 @@
+apiVersion: v1
+data:
+  docker-php-ext-apcu.ini: 'extension=apcu
+
+    '
+  docker-php-ext-intl.ini: 'extension=intl.so
+
+    '
+  docker-php-ext-ldap.ini: 'extension=ldap.so
+
+    '
+  docker-php-ext-mysqli.ini: 'extension=mysqli.so
+
+    '
+  docker-php-ext-opcache.ini: 'zend_extension=opcache.so
+
+    '
+  docker-php-ext-sodium.ini: 'extension=sodium
+
+    '
+  opcache-recommended.ini: 'opcache.memory_consumption=128
+
+    opcache.interned_strings_buffer=8
+
+    opcache.max_accelerated_files=4000
+
+    opcache.revalidate_freq=60
+
+    '
+kind: ConfigMap
+metadata:
+  name: configmap-php-confd
+  namespace: cita-wiki

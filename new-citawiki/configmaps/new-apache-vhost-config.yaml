@@ -1,0 +1,75 @@
+apiVersion: v1
+data:
+  vhost-adminwiki.conf: "<VirtualHost *:80>\n   ServerName adminwiki.cita.utoronto.ca\n\
+    \   Redirect permanent / https://adminwiki.cita.utoronto.ca/\n</VirtualHost>\n\
+    \n<VirtualHost _default_:443>\n  ServerName adminwiki.cita.utoronto.ca\n  DocumentRoot\
+    \ /var/www/adminwiki/html\n  #DocumentRoot /var/www/html\n\n  SSLEngine on\n \
+    \ SSLCertificateFile /etc/apache2/ssl/cita-wildcard.crt\n  SSLCertificateKeyFile\
+    \ /etc/apache2/ssl/cita-wildcard.key\n  SSLCACertificateFile /etc/apache2/ssl/STAR_cita_utoronto_ca.ca-bundle\n\
+    \n  RewriteEngine On\n  RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK)\n  RewriteRule\
+    \ .* - [F]\n  RewriteRule ^/adminwiki(/|$) /index.php/ [PT]\n\n  <Directory \"\
+    /var/www/adminwiki/html\">\n          AllowOverride None\n          Require all\
+    \ granted\n  </Directory>\n\n</VirtualHost>\n"
+  vhost-computewiki.conf: "<VirtualHost *:80>\n   ServerName wiki.cita.utoronto.ca\n\
+    \   Redirect permanent / https://wiki.cita.utoronto.ca/\n</VirtualHost>\n\n<VirtualHost\
+    \ _default_:443>\n  ServerName wiki.cita.utoronto.ca\n  DocumentRoot /var/www/computewiki/html\n\
+    \  #DocumentRoot /var/www/html\n\n  SSLEngine on\n  SSLCertificateFile /etc/apache2/ssl/cita-wildcard.crt\n\
+    \  SSLCertificateKeyFile /etc/apache2/ssl/cita-wildcard.key\n  SSLCACertificateFile\
+    \ /etc/apache2/ssl/STAR_cita_utoronto_ca.ca-bundle\n\n  RewriteEngine On\n  RewriteCond\
+    \ %{REQUEST_METHOD} ^(TRACE|TRACK)\n  RewriteRule .* - [F]\n  RewriteRule ^/computewiki(/|$)\
+    \ /index.php/ [PT]\n\n  <Directory \"/var/www/computewiki/html\">\n          AllowOverride\
+    \ None\n          Require all granted\n  </Directory>\n</VirtualHost>\n"
+  vhost-malvarezwiki.conf: "<VirtualHost *:80>\n    ServerName mocks.cita.utoronto.ca\n\
+    \    Redirect permanent / https://mocks.cita.utoronto.ca/\n</VirtualHost>\n\n\
+    <VirtualHost _default_:443>\n    ServerName mocks.cita.utoronto.ca\n    DocumentRoot\
+    \ /var/www/malvarezwiki/html\n\n    SSLEngine on\n    SSLCertificateFile /etc/apache2/ssl/cita-wildcard.crt\n\
+    \    SSLCertificateKeyFile /etc/apache2/ssl/cita-wildcard.key\n    SSLCACertificateFile\
+    \ /etc/apache2/ssl/STAR_cita_utoronto_ca.ca-bundle\n\n    RewriteEngine On\n \
+    \   RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK)\n    RewriteRule .* - [F]\n \
+    \   RewriteRule ^/malvarezwiki(/|$) /index.php/ [PT]\n    RewriteRule ^/websky$\
+    \ index.php/WebSky_Extragalactic_CMB_Mocks [R]\n\n    <Directory \"/var/www/malvarezwiki/html/data\"\
+    >\n            Options +Indexes +FollowSymLinks\n            AllowOverride All\n\
+    \            Require all granted\n    </Directory>\n\n    <Directory \"/var/www/malvarezwiki/html\"\
+    >\n            AllowOverride All\n            Require all granted\n    </Directory>\n\
+    \n</VirtualHost>\n"
+  vhost-penwiki.conf: "<VirtualHost *:80>\n   ServerName eor.cita.utoronto.ca\n  \
+    \ Redirect permanent / https://eor.cita.utoronto.ca/\n</VirtualHost>\n\n<VirtualHost\
+    \ _default_:443>\n  ServerName eor.cita.utoronto.ca\n  DocumentRoot /var/www/penwiki/html\n\
+    \  #DocumentRoot /var/www/html\n\n  SSLEngine on\n  SSLCertificateFile /etc/apache2/ssl/cita-wildcard.crt\n\
+    \  SSLCertificateKeyFile /etc/apache2/ssl/cita-wildcard.key\n  SSLCACertificateFile\
+    \ /etc/apache2/ssl/STAR_cita_utoronto_ca.ca-bundle\n\n  RewriteEngine On\n  RewriteCond\
+    \ %{REQUEST_METHOD} ^(TRACE|TRACK)\n  RewriteRule .* - [F]\n  RewriteRule ^/penwiki(/|$)\
+    \ /index.php/ [PT]\n\n  <Directory \"/var/www/penwiki/html\">\n          AllowOverride\
+    \ None\n          Require all granted\n  </Directory>\n\n</VirtualHost>\n"
+  vhost-planet.conf: "<VirtualHost *:80>\n    ServerName planet.cita.utoronto.ca\n\
+    \    Redirect permanent / https://planet.cita.utoronto.ca/\n</VirtualHost>\n\n\
+    <VirtualHost *:443>\n    ServerName planet.cita.utoronto.ca\n    DocumentRoot\
+    \ /var/www/dokuwiki-planet\n\n    ErrorLog /var/log/apache2/planet-ssl_error.log\n\
+    \    CustomLog /var/log/apache2/planet-ssl_access.log combined\n\n    SSLEngine\
+    \ on\n    SSLCertificateFile /etc/apache2/ssl/cita-wildcard.crt\n    SSLCertificateKeyFile\
+    \ /etc/apache2/ssl/cita-wildcard.key\n    SSLCACertificateFile /etc/apache2/ssl/STAR_cita_utoronto_ca.ca-bundle\n\
+    \n    RewriteEngine On\n    RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK)\n   \
+    \ RewriteRule .* - [F]\n\n    <Directory \"/var/www/dokuwiki-planet\">\n     \
+    \   Options -Indexes\n        AllowOverride None\n        Require all granted\n\
+    \    </Directory>\n\n    <DirectoryMatch \"^/var/www/dokuwiki-planet/(conf|data|bin|inc|vendor)(/|$)\"\
+    >\n        Require all denied\n    </DirectoryMatch>\n\n    <Location \"/install.php\"\
+    >\n        Require all granted\n    </Location>\n\n    <FilesMatch \"^\\.\">\n\
+    \        Require all denied\n    </FilesMatch>\n</VirtualHost>\n"
+  vhost-randoastro.conf: "<VirtualHost *:80>\n    ServerName randoastro.cita.utoronto.ca\n\
+    \    Redirect permanent / https://randoastro.cita.utoronto.ca/\n</VirtualHost>\n\
+    \n<VirtualHost *:443>\n    ServerName randoastro.cita.utoronto.ca\n    DocumentRoot\
+    \ /var/www/dokuwiki-randoastro\n\n    ErrorLog /var/log/apache2/randoastro-ssl_error.log\n\
+    \    CustomLog /var/log/apache2/randoastro-ssl_access.log combined\n\n    SSLEngine\
+    \ on\n    SSLCertificateFile /etc/apache2/ssl/cita-wildcard.crt\n    SSLCertificateKeyFile\
+    \ /etc/apache2/ssl/cita-wildcard.key\n    SSLCACertificateFile /etc/apache2/ssl/STAR_cita_utoronto_ca.ca-bundle\n\
+    \n    RewriteEngine On\n    RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK)\n   \
+    \ RewriteRule .* - [F]\n\n    <Directory \"/var/www/dokuwiki-randoastro\">\n \
+    \       Options -Indexes\n        AllowOverride None\n        Require all granted\n\
+    \    </Directory>\n\n    <DirectoryMatch \"^/var/www/dokuwiki-randoastro/(conf|data|bin|inc|vendor)(/|$)\"\
+    >\n        Require all denied\n    </DirectoryMatch>\n\n    <Files \"install.php\"\
+    >\n        Require all denied\n    </Files>\n\n    <FilesMatch \"^\\.\">\n   \
+    \     Require all denied\n    </FilesMatch>\n</VirtualHost>\n"
+kind: ConfigMap
+metadata:
+  name: new-apache-vhost-config
+  namespace: cita-wiki
