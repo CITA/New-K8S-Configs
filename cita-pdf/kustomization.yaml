@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cita-pdf
+
+resources:
+  # ConfigMaps
+  - app-config.yaml
+  - nginx-config.yaml
+  - mysql-cnf-config.yaml
+  - mysql-initdb-config.yaml
+
+  # Service
+  - service.yaml
+
+  # Deployment
+  - deployment.yaml

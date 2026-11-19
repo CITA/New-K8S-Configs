@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pvc-87237867-fb98-4b68-b74d-b2a139f7bcc1
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 10Gi
+  csi:
+    driver: nfs.csi.k8s.io
+    volumeAttributes:
+      csi.storage.k8s.io/pv/name: pvc-87237867-fb98-4b68-b74d-b2a139f7bcc1
+      csi.storage.k8s.io/pvc/name: cita-site-database-pvc
+      csi.storage.k8s.io/pvc/namespace: cita-site-website
+      server: nfs.cita.utoronto.ca
+      share: /obj/k8s/pvcs
+      storage.kubernetes.io/csiProvisionerIdentity: 1788288755414-6142-nfs.csi.k8s.io
+      subDir: cita-site-website-cita-site-database-pvc-pvc-87237867-fb98-4b68-b74d-b2a139f7bcc1
+    volumeHandle: nfs.cita.utoronto.ca#obj/k8s/pvcs#cita-site-website-cita-site-database-pvc-pvc-87237867-fb98-4b68-b74d-b2a139f7bcc1#pvc-87237867-fb98-4b68-b74d-b2a139f7bcc1#
+  mountOptions:
+  - nfsvers=4.1
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-cita
+  volumeMode: Filesystem

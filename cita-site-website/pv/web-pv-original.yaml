@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    pv.kubernetes.io/provisioned-by: nfs.csi.k8s.io
+    volume.kubernetes.io/provisioner-deletion-secret-name: ""
+    volume.kubernetes.io/provisioner-deletion-secret-namespace: ""
+  creationTimestamp: "2026-09-24T17:46:31Z"
+  finalizers:
+  - kubernetes.io/pv-protection
+  name: pvc-b27cf418-7d0f-4213-aa1a-164d58848b00
+  resourceVersion: "5683504"
+  uid: 7713a4b9-def3-4588-a3b9-c7db30c27e9b
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 20Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: cita-site-wordpress-pvc
+    namespace: cita-site-website
+    resourceVersion: "5683495"
+    uid: b27cf418-7d0f-4213-aa1a-164d58848b00
+  csi:
+    driver: nfs.csi.k8s.io
+    volumeAttributes:
+      csi.storage.k8s.io/pv/name: pvc-b27cf418-7d0f-4213-aa1a-164d58848b00
+      csi.storage.k8s.io/pvc/name: cita-site-wordpress-pvc
+      csi.storage.k8s.io/pvc/namespace: cita-site-website
+      server: nfs.cita.utoronto.ca
+      share: /obj/k8s/pvcs
+      storage.kubernetes.io/csiProvisionerIdentity: 1788288755414-6142-nfs.csi.k8s.io
+      subDir: cita-site-website-cita-site-wordpress-pvc-pvc-b27cf418-7d0f-4213-aa1a-164d58848b00
+    volumeHandle: nfs.cita.utoronto.ca#obj/k8s/pvcs#cita-site-website-cita-site-wordpress-pvc-pvc-b27cf418-7d0f-4213-aa1a-164d58848b00#pvc-b27cf418-7d0f-4213-aa1a-164d58848b00#
+  mountOptions:
+  - nfsvers=4.1
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-cita
+  volumeMode: Filesystem
+status:
+  lastPhaseTransitionTime: "2026-09-24T17:46:31Z"
+  phase: Bound

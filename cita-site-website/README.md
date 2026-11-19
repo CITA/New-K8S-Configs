@@ -1,131 +1,195 @@
 # CITA Production Website - Kubernetes Configuration
 
-This directory contains the Kubernetes recovery configuration for:
+Production URL: https://www.cita.utoronto.ca/
+Namespace: cita-site-website
+Configuration directory: /k8s/configs/cita-site-website
+External LoadBalancer IP: 142.1.127.106
 
-    https://www.cita.utoronto.ca/
+## 1. Overview
 
-Namespace:
+This directory contains the Kubernetes configuration for
+the production CITA WordPress website and MariaDB database.
 
-    cita-site-website
+Web Deployment:
+  cita-site-website
 
-Production LoadBalancer IP:
+Web image:
+  citadockerhub/wordpress_k8s:1.0.3
 
-    142.1.127.106
+Database Deployment:
+  cita-site-mariadb
 
-## Components
-
-Web application:
-
-    Deployment: cita-site-website
-    Image:      citadockerhub/wordpress_k8s:1.0.3
+Database image:
+  mariadb:10.5
 
 Database:
+  wordpress
 
-    Deployment: cita-site-mariadb
-    Image:      mariadb:10.5
-    Database:   wordpress
+Production runs on Kubernetes.
+ant.cita.utoronto.ca is the standby server.
 
-## Resources
+## 2. Kubernetes Resources
 
-WordPress web:
+kustomization.yaml contains:
 
-    requests:
-      cpu:    500m
-      memory: 1Gi
+- 4 ConfigMaps
+- 4 Secrets
+- 3 Services
+- 2 Deployments
 
-    limits:
-      cpu:    2
-      memory: 2Gi
+Namespace, PVs and PVCs are managed separately.
 
-MariaDB:
+## 3. Configuration Files
 
-    requests:
-      cpu:    500m
-      memory: 1Gi
+namespace.yaml
+  Namespace creation manifest.
 
-    limits:
-      cpu:    2
-      memory: 2Gi
+web-deployment.yaml
+db-deployment.yaml
+  Application Deployments.
 
-## Persistent Storage
+web-service.yaml
+web-external-service.yaml
+db-service.yaml
+  Kubernetes Services.
 
-WordPress:
+web-pvc.yaml
+db-pvc.yaml
+  Standard PVC definitions.
+  Not included in kustomization.yaml.
 
-    PVC: cita-site-wordpress-pvc
-    Size: 20Gi
-    StorageClass: nfs-cita
+apache-config.yaml
+php-config.yaml
+userdir-config.yaml
+wordpress-config.yaml
+  Application ConfigMaps.
 
-MariaDB:
+secret-mariadb-root.yaml
+secret-wordpress.yaml
+secret-dockerhub.yaml
+secrets/cita-site-tls.yaml
+  Kubernetes Secrets containing sensitive data.
 
-    PVC: cita-site-database-pvc
-    Size: 10Gi
-    StorageClass: nfs-cita
+pv/
+  Original PV snapshots and recovery PV/PVC manifests.
 
-## Additional Filesystems
+RECOVERY.md
+  Complete namespace and storage recovery instructions.
 
-CITA shared web content:
+apache-certs-keys.sh
+  TLS certificate renewal helper.
 
-    /obj/www
-        -> /cita/d/www
+archive/
+  Historical deployment files and migration documentation.
 
-Legacy project web content:
+## 4. Persistent Storage
 
-    128.100.76.92:/fs/lustre/project
-        -> /cita/web-lustre/project
+StorageClass:
+  nfs-cita
 
-The project filesystem is mounted read-only.
+NFS server:
+  nfs.cita.utoronto.ca
 
-## Legacy URLs
+NFS share:
+  /obj/k8s/pvcs
 
-The Apache configuration preserves:
+Reclaim policy:
+  Retain
 
-    /DHIGLS/
-    /GHIGLS/
-    /HOTT/
-    /Jing_memorial/
-    /NCPL/
-    /recording/
-    /rss/
-    /Simplistics/
-    /webpages/
+WordPress PVC:
+  cita-site-wordpress-pvc
+  20Gi
 
-CITA per-user websites are also available as:
+MariaDB PVC:
+  cita-site-database-pvc
+  10Gi
 
-    /~username/
+## 5. Additional Filesystems
 
-## Configuration Files
+Shared CITA web content:
 
-    web-deployment.yaml
-    web-service.yaml
-    web-external-service.yaml
-    web-pvc.yaml
+  142.1.127.49:/obj/www
+  Mounted at /cita/d/www
 
-    db-deployment.yaml
-    db-service.yaml
-    db-pvc.yaml
+Legacy project content:
 
-    apache-config.yaml
-    php-config.yaml
-    userdir-config.yaml
-    wordpress-config.yaml
+  128.100.76.92:/fs/lustre/project
+  Mounted at /cita/web-lustre/project
+  Read-only
 
-    secret-mariadb-root.yaml
-    secret-wordpress.yaml
-    secret-tls.yaml
-    secret-dockerhub.yaml
+These NFS exports must be available for the website.
 
-    kustomization.yaml
+## 6. Normal Deployment
 
-The secret YAML files contain sensitive data and must remain protected.
+Use only when the namespace and original PVCs exist.
 
-## Important
+cd /k8s/configs/cita-site-website
 
-These manifests reproduce the Kubernetes configuration.
+kubectl apply -k .
 
-The WordPress files and MariaDB database are stored on persistent
-NFS-backed volumes. The YAML files themselves are NOT a backup of
-the WordPress content or database.
+kubectl rollout status deployment/cita-site-mariadb \
+  -n cita-site-website
 
-Current production is Kubernetes.
+kubectl rollout status deployment/cita-site-website \
+  -n cita-site-website
 
-The host ant.cita.utoronto.ca is the standby server.
+kubectl get pods,svc,pvc -n cita-site-website
+
+## 7. Disaster Recovery
+
+Follow RECOVERY.md.
+
+Do not recreate PVCs using standard PVC manifests
+if the original NFS data must be recovered.
+
+Use the recovery PV/PVC manifests under pv/.
+
+## 8. TLS Certificate Renewal
+
+Certificate source directory:
+
+  /k8s/configs/TLS
+
+Renew the TLS Secret using:
+
+  ./apache-certs-keys.sh
+
+After renewal, refresh the saved TLS Secret manifest:
+
+  secrets/cita-site-tls.yaml
+
+The saved Secret must contain the latest certificate
+and private key for disaster recovery.
+
+## 9. Website Verification
+
+Verify Kubernetes resources:
+
+kubectl get pods,svc,pvc -n cita-site-website
+
+Verify the production website:
+
+curl -I https://www.cita.utoronto.ca/
+
+Confirm:
+- WordPress loads over HTTPS.
+- Existing pages and uploads are accessible.
+- MariaDB contains the expected WordPress database.
+- Legacy URLs and userdir websites work.
+- External NFS mounts are available.
+
+## 10. Security and Backups
+
+- Protect all Secret YAML files.
+- Keep an encrypted backup outside vma.
+- Keep database and WordPress file backups separately.
+- Do not commit unencrypted Secrets to Git.
+- Never delete PVCs during routine maintenance.
+- Verify the original NFS data before disaster recovery.
+
+Production/standby synchronization direction:
+
+  Kubernetes production -> ant standby
+
+Do not synchronize ant -> Kubernetes unless intentionally
+performing a recovery from the standby server.

@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pvc-b27cf418-7d0f-4213-aa1a-164d58848b00
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 20Gi
+  csi:
+    driver: nfs.csi.k8s.io
+    volumeAttributes:
+      csi.storage.k8s.io/pv/name: pvc-b27cf418-7d0f-4213-aa1a-164d58848b00
+      csi.storage.k8s.io/pvc/name: cita-site-wordpress-pvc
+      csi.storage.k8s.io/pvc/namespace: cita-site-website
+      server: nfs.cita.utoronto.ca
+      share: /obj/k8s/pvcs
+      storage.kubernetes.io/csiProvisionerIdentity: 1788288755414-6142-nfs.csi.k8s.io
+      subDir: cita-site-website-cita-site-wordpress-pvc-pvc-b27cf418-7d0f-4213-aa1a-164d58848b00
+    volumeHandle: nfs.cita.utoronto.ca#obj/k8s/pvcs#cita-site-website-cita-site-wordpress-pvc-pvc-b27cf418-7d0f-4213-aa1a-164d58848b00#pvc-b27cf418-7d0f-4213-aa1a-164d58848b00#
+  mountOptions:
+  - nfsvers=4.1
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-cita
+  volumeMode: Filesystem
