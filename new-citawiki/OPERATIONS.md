@@ -7,13 +7,11 @@ Applications:
 - MediaWiki: new-citawiki
 - MariaDB: new-citawiki-db
 
-All commands below are executed from:
+## 1. Stop / Start Website Only
 
 cd /k8s/configs/new-citawiki
 
-## 1. Stop / Start Website Only
-
-Stop MediaWiki (MariaDB remains running):
+Stop MediaWiki:
 
 ./Stop-Website-only.sh
 
@@ -21,89 +19,56 @@ Start MediaWiki:
 
 ./Start-Website-only.sh
 
+MariaDB remains running.
+
 ## 2. Stop / Start Website and MariaDB
+
+cd /k8s/configs/new-citawiki
 
 Stop both applications:
 
 ./Stop-Website-DB.sh
 
-This stops MediaWiki first, then MariaDB.
-
 Start both applications:
 
 ./Start-Website-DB.sh
 
-This starts MariaDB first, waits until it is ready,
-then starts MediaWiki.
+Stop order: MediaWiki -> MariaDB
+Start order: MariaDB -> MediaWiki
 
 ## 3. Apply Changes Affecting MediaWiki Only
 
-Use after modifying:
-- Apache ConfigMaps
-- PHP ConfigMaps
-- Postfix ConfigMap
-- MediaWiki application Secret
-- Web Deployment
-- Web Service
+cd /k8s/configs/new-citawiki
 
-Procedure:
-
-# Stop MediaWiki
-./Stop-Website-only.sh
-
-# Validate and apply changes
+# 1. Validate and apply configuration
 ./Apply-Changes.sh
 
-# Start MediaWiki
+# 2. Stop MediaWiki
+./Stop-Website-only.sh
+
+# 3. Start MediaWiki
 ./Start-Website-only.sh
-
-NOTE:
-Apply-Changes.sh may automatically start the Deployment
-if replicas is set to 1 in the Deployment YAML.
-
-Running Start-Website-only.sh afterward is safe.
-Scaling an already running Deployment to 1 does not
-restart its Pod.
-
-If Apply-Changes.sh fails, investigate before proceeding.
 
 ## 4. Apply Changes Affecting MediaWiki and MariaDB
 
-Use after modifying:
-- Web and database Deployments
-- ConfigMaps or Secrets affecting both applications
-- Other configuration requiring both applications to stop
+cd /k8s/configs/new-citawiki
 
-Procedure:
-
-# Stop MediaWiki first, then MariaDB
-./Stop-Website-DB.sh
-
-# Validate and apply changes
+# 1. Validate and apply configuration
 ./Apply-Changes.sh
 
-# Start MariaDB first, then MediaWiki
+# 2. Stop MediaWiki and MariaDB
+./Stop-Website-DB.sh
+
+# 3. Start MariaDB and MediaWiki
 ./Start-Website-DB.sh
-
-NOTE:
-Apply-Changes.sh may automatically start both Deployments
-before Start-Website-DB.sh runs.
-
-The Start script safely sets replicas to 1 again,
-but does not guarantee database-first startup if
-Apply-Changes.sh already started both applications.
-
-If Apply-Changes.sh fails, investigate before proceeding.
 
 ## 5. Important Notes
 
-- Apply-Changes.sh validates configuration before applying.
-- Validation failure prevents the apply step.
-- A failed apply may leave partially updated resources.
-- Never delete PVCs or PVs during routine maintenance.
-- Do not delete the namespace to restart applications.
+- Apply-Changes.sh validates before applying.
+- If Apply-Changes.sh fails, stop and investigate.
+- Applying Deployment changes may automatically restart Pods.
+- The subsequent stop/start creates fresh Pods.
+- Do not delete PVCs or PVs during routine maintenance.
+- TLS certificates are managed using apache-certs-keys.sh.
 - Use RECOVERY.md for disaster recovery.
-- TLS certificates are managed separately using
-  apache-certs-keys.sh.
-- MariaDB password changes require coordinated database
-  credential updates, not just a Secret change and restart.
+- Database password changes require coordinated credential updates.

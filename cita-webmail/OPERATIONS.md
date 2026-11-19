@@ -5,110 +5,43 @@ Configuration directory: /k8s/configs/cita-webmail
 
 Application:
 - Deployment: cita-webmail
-- Pod: 2 containers (db, web)
-- External IP: 142.1.127.101
-
-All commands below are executed from:
-
-cd /k8s/configs/cita-webmail
+- Pod: 2 containers (MariaDB, Roundcube)
 
 ## 1. Stop / Start CITA Webmail
 
-Stop the entire application:
+cd /k8s/configs/cita-webmail
+
+Stop application:
 
 ./Stop-Webmail.sh
 
-This scales the cita-webmail Deployment to 0 replicas
-and waits for the Pod to terminate.
-
-Start the entire application:
+Start application:
 
 ./Start-Webmail.sh
 
-This scales the Deployment to 1 replica and waits
-until it becomes available.
-
-Both operations affect:
-- MariaDB
-- Roundcube webmail
+Both commands affect MariaDB and Roundcube.
 
 ## 2. Apply Configuration Changes
 
-Use after modifying:
-- deployment.yaml
-- service.yaml
-- configmap-apache.yaml
-- configmap-roundcube.yaml
-- secrets.yaml
-- dbbackup-secret.yaml
+cd /k8s/configs/cita-webmail
 
-Procedure:
-
-# Stop CITA Webmail
-./Stop-Webmail.sh
-
-# Validate and apply changes
+# 1. Validate and apply configuration
 ./Apply-Changes.sh
 
-# Start CITA Webmail
+# 2. Stop application
+./Stop-Webmail.sh
+
+# 3. Start application
 ./Start-Webmail.sh
 
-NOTE:
-Apply-Changes.sh may automatically start the Deployment
-if replicas is set to 1 in deployment.yaml.
+## 3. Important Notes
 
-Running Start-Webmail.sh afterward is safe.
-Scaling an already running Deployment to 1 does not
-restart its Pod.
-
-If Apply-Changes.sh fails, investigate before proceeding.
-
-## 3. TLS Certificate Renewal
-
-The Apache TLS Secret is managed separately.
-
-Secret:
-apache2-certs-keys
-
-Certificate source:
-/k8s/configs/TLS
-
-After updating certificate files, run:
-
-./apache-certs-keys.sh
-
-Verify:
-
-kubectl get secret apache2-certs-keys -n cita-webmail
-
-Restart CITA Webmail if Apache does not automatically
-load the renewed certificate.
-
-## 4. Verify Application
-
-Check Kubernetes resources:
-
-kubectl get deployments,pods,svc,pvc -n cita-webmail
-
-Check the production HTTPS endpoint using its
-configured public hostname.
-
-Expected:
-- Deployment: 1/1 Ready
-- Pod: 2/2 Running
-- Service external IP: 142.1.127.101
-
-## 5. Important Notes
-
-- Apply-Changes.sh validates configuration before applying.
-- Validation failure prevents the apply step.
-- A failed apply may leave partially updated resources.
-- Never delete PVCs or PVs during routine maintenance.
-- Do not delete the namespace to restart the application.
+- Apply-Changes.sh validates before applying.
+- If Apply-Changes.sh fails, stop and investigate.
+- Applying Deployment changes may automatically restart Pods.
+- The subsequent stop/start creates a fresh Pod.
+- Do not delete PVCs or PVs during routine maintenance.
+- TLS certificates are managed using apache-certs-keys.sh.
 - The database PVC is managed separately from Kustomize.
-- Docker Hub and TLS Secrets are managed separately.
-- Stop/start affects both MariaDB and Roundcube.
-- Do not stop the application during an active database backup.
-- Database password changes require coordinated database
-  credential updates, not just a Secret change and restart.
-- Use a separate recovery procedure for namespace or storage loss.
+- Stop/start also stops MariaDB.
+- Avoid stopping during active database backups.
